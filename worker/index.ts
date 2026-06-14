@@ -4,6 +4,7 @@ import {
   applyMoveToGame,
   applyTimeoutIfNeeded,
   createFreshGame,
+  createInitialCastlingRights,
   createInitialChessState,
   getLegalMovesForSquare,
 } from "../shared/chess";
@@ -401,7 +402,24 @@ export class GameRoom extends DurableObject<Env> {
 
   private normalizeStoredRoom(stored: StoredRoom): StoredRoom {
     if ("game" in stored && stored.game) {
-      return stored;
+      return {
+        room: stored.room,
+        game: {
+          ...stored.game,
+          castlingRights: stored.game.castlingRights ?? createInitialCastlingRights(),
+          enPassantTarget: stored.game.enPassantTarget ?? null,
+          lastMove: stored.game.lastMove
+            ? {
+                ...stored.game.lastMove,
+                special: stored.game.lastMove.special ?? null,
+              }
+            : null,
+          moves: stored.game.moves.map((move) => ({
+            ...move,
+            special: move.special ?? null,
+          })),
+        },
+      };
     }
 
     return {
@@ -527,7 +545,10 @@ export default {
 
       const payload = (await response.json()) as RoomPayload;
       return json({
-        moves: getLegalMovesForSquare(payload.game.board, square, payload.game.activeColor),
+        moves: getLegalMovesForSquare(payload.game.board, square, payload.game.activeColor, {
+          castlingRights: payload.game.castlingRights,
+          enPassantTarget: payload.game.enPassantTarget,
+        }),
       });
     }
 

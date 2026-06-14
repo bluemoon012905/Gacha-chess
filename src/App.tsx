@@ -173,7 +173,10 @@ export default function App() {
   const playerColor = getPlayerColor(gameState, joinRole);
   const legalTargets = useMemo(() => {
     if (!gameState || !selectedSquare) return [];
-    return getLegalMovesForSquare(gameState.board, selectedSquare, gameState.activeColor);
+    return getLegalMovesForSquare(gameState.board, selectedSquare, gameState.activeColor, {
+      castlingRights: gameState.castlingRights,
+      enPassantTarget: gameState.enPassantTarget,
+    });
   }, [gameState, selectedSquare]);
   const clocks = useDerivedClock(gameState);
 
@@ -588,8 +591,8 @@ export default function App() {
               <p className="meta-line">Created {formatTimestamp(roomState.createdAt)}</p>
             ) : null}
             <p className="meta-line">
-              Current rules: standard movement, automatic queen promotion, no castling or en
-              passant yet.
+              Current rules: standard movement, castling, en passant, and automatic queen
+              promotion.
             </p>
             {message ? <p className="status-line">{message}</p> : null}
             {error ? <p className="error-line">{error}</p> : null}
