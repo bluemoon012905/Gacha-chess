@@ -88,6 +88,15 @@ You will also need:
 - Wrangler authentication via `npx wrangler login`
 - a unique Worker name if `gacha-chess` is already taken in your account
 
+## Cloudflare Setup
+
+1. Create a Cloudflare account if you do not already have one.
+2. Run `npx wrangler login` on your machine.
+3. Complete the browser-based authorization flow.
+4. Return here and tell me the login completed.
+
+Do not paste Cloudflare tokens, cookies, or other secrets into chat. If you want me to verify progress, paste only the non-secret command output or tell me the login succeeded.
+
 ## Documentation
 
 - [Browser Pivot Notes](docs/browser-pivot.md)
