@@ -1,25 +1,26 @@
 # Gacha-chess
 
-This repository is now being repurposed from a design-only tactics game concept into a browser-based multiplayer prototype.
+This repository now uses a multi-game room architecture instead of a single hard-wired chess room.
 
-The first implementation target is:
+The current playable path is still standard chess, but the room system, frontend entry flow, and shared models have been split so additional games can be added without rewriting the lobby or Durable Object lifecycle.
 
-- a browser client
-- a Cloudflare Worker backend
-- a Durable Object per room
-- shareable room links for head-to-head play
+## What Changed
 
-## Current Status
+- a homepage now acts as the game selector and room entry screen
+- room creation is generic and requires a `gameKey`
+- room lifecycle logic is shared across games
+- game-specific logic lives under `shared/games/<game>/`
+- chess state definitions and chess behavior rules are stored separately
+- players get a generated persistent display name stored in browser local storage
+- rooms display host and guest by generated name
 
-The repository now contains an initial scaffold for:
+## Current Flow
 
-- a React + Vite browser client
-- a Cloudflare Worker API
-- a `GameRoom` Durable Object
-- room creation and join endpoints
-- realtime room updates over WebSockets
-- browser-local player identity for seat reclaim on refresh
-- documentation for the pivot and local development flow
+1. Open the homepage.
+2. Select a game.
+3. Create a room or paste an existing room code.
+4. Join the room as host or guest.
+5. Start the match once both seats are filled.
 
 ## Project Layout
 
@@ -27,9 +28,26 @@ The repository now contains an initial scaffold for:
 Gacha-chess/
 ├── docs/
 │   ├── browser-pivot.md
+│   ├── deployment.md
 │   └── game-design.md
-├── public/
+├── shared/
+│   ├── games/
+│   │   └── chess/
+│   │       ├── behaviors/
+│   │       │   └── engine.ts
+│   │       ├── logic/
+│   │       │   ├── state.ts
+│   │       │   └── types.ts
+│   │       └── index.ts
+│   ├── player.ts
+│   └── types.ts
 ├── src/
+│   ├── games/
+│   │   └── chess/
+│   │       └── ChessRoomView.tsx
+│   ├── lib/
+│   │   ├── player.ts
+│   │   └── routes.ts
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── styles.css
@@ -43,9 +61,37 @@ Gacha-chess/
 └── wrangler.jsonc
 ```
 
-## Commands
+## Architecture
 
-After installing dependencies:
+### Shared Room Layer
+
+`worker/index.ts` owns:
+
+- room creation
+- host/guest seat claims
+- generated room IDs
+- WebSocket fanout
+- room snapshots
+- generic game dispatch by `gameKey`
+
+### Game Modules
+
+Each game can expose:
+
+- metadata for the home screen
+- initial state creation
+- configuration rules
+- start rules
+- action handling
+- normalization and timeout refresh behavior
+
+Chess currently uses:
+
+- [`shared/games/chess/logic/types.ts`](shared/games/chess/logic/types.ts)
+- [`shared/games/chess/logic/state.ts`](shared/games/chess/logic/state.ts)
+- [`shared/games/chess/behaviors/engine.ts`](shared/games/chess/behaviors/engine.ts)
+
+## Commands
 
 ```bash
 npm install
@@ -55,56 +101,37 @@ npm run dev
 Useful additional commands:
 
 ```bash
+npm run typecheck
 npm run build
 npm run deploy
-npm run cf-typegen
 ```
 
-## Local Vs Public Use
+## API Shape
 
-- `npm run dev` is local development only. It is for previewing the app on your machine while you are building it.
-- Public room links require deployment to Cloudflare because the app depends on a Worker and Durable Objects.
-- GitHub Pages alone is not enough for the current architecture because it cannot run the room API or WebSocket room server.
+Current Worker endpoints:
+
+- `GET /api/health`
+- `GET /api/games`
+- `POST /api/rooms`
+- `GET /api/rooms/:roomId`
+- `POST /api/rooms/:roomId/join`
+- `POST /api/rooms/:roomId/configure`
+- `POST /api/rooms/:roomId/start`
+- `POST /api/rooms/:roomId/action`
+- `GET /api/rooms/:roomId/socket`
 
 ## Deployment
 
-The intended deployment target is Cloudflare:
+The intended production target remains Cloudflare:
 
-- static frontend assets served through the Cloudflare build/deploy flow
-- Worker API deployed with Wrangler
-- `GameRoom` Durable Object bound in the same deployment
+- static frontend assets
+- a Worker API
+- one Durable Object instance per room
+- SPA routes such as `/room/:roomId`
 
-Basic deploy flow:
-
-```bash
-npm install
-npm run build
-npm run deploy
-```
-
-You will also need:
-
-- a Cloudflare account
-- Wrangler authentication via `npx wrangler login`
-- a unique Worker name if `gacha-chess` is already taken in your account
-
-## Cloudflare Setup
-
-1. Create a Cloudflare account if you do not already have one.
-2. Run `npx wrangler login` on your machine.
-3. Complete the browser-based authorization flow.
-4. Open the Cloudflare Workers dashboard once if this is the first Worker on the account so Cloudflare can create the account's `workers.dev` subdomain.
-5. Run `npm run deploy`.
-
-Do not paste Cloudflare tokens, cookies, or other secrets into chat. If you want me to verify progress, paste only the non-secret command output or tell me the login succeeded.
-
-## Documentation
-
-- [Browser Pivot Notes](docs/browser-pivot.md)
-- [Deployment Notes](docs/deployment.md)
-- [Original Game Design Notes](docs/game-design.md)
+See [Deployment Notes](docs/deployment.md) for the current hosting model.
 
 ## Notes
 
-- The original single-player Fairy-Stockfish design document is still preserved in `docs/game-design.md`.
-- The Windows Fairy-Stockfish binary is still in the repo, but it is not part of the new browser room scaffold.
+- The original design notes are still preserved in [docs/game-design.md](docs/game-design.md).
+- Only chess is implemented today, but the repo is now structured for additional room-based games.

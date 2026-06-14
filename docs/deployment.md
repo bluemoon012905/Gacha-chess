@@ -10,6 +10,7 @@ It currently requires:
 - a Cloudflare Worker
 - a Durable Object for per-room state
 - WebSocket support through the Worker and Durable Object
+- shared room dispatch that can route actions by `gameKey`
 
 Because of that, GitHub Pages by itself is not a valid production host for the full app.
 
@@ -42,9 +43,12 @@ The cleanest deployment shape is:
 
 This keeps routing simple for:
 
+- `/`
 - `/room/:roomId`
+- `/api/games`
 - `/api/rooms`
 - `/api/rooms/:roomId`
+- `/api/rooms/:roomId/action`
 - `/api/rooms/:roomId/socket`
 
 ## Local Development
@@ -104,7 +108,7 @@ The main deployment files are:
 
 ## Current Constraints
 
-- The app is still a room/lobby prototype, not a playable chess game.
+- Only one game is implemented today, even though the room system is now multi-game.
 - There is no production environment variable setup yet.
 - There is no CI/CD pipeline yet.
 - The repo does not yet include a Cloudflare Pages project config or GitHub Actions workflow.

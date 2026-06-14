@@ -5,15 +5,16 @@
     "Segoe UI",
     sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(255, 204, 112, 0.9), transparent 28%),
-    radial-gradient(circle at top right, rgba(91, 141, 239, 0.35), transparent 24%),
-    linear-gradient(180deg, #f6f1e8 0%, #efe3cc 100%);
-  color: #1a1a1a;
-  --ink: #1a1a1a;
-  --muted: rgba(26, 26, 26, 0.74);
+    radial-gradient(circle at top left, rgba(255, 196, 112, 0.95), transparent 30%),
+    radial-gradient(circle at top right, rgba(60, 112, 214, 0.25), transparent 28%),
+    linear-gradient(180deg, #f6f1e8 0%, #ebdfca 100%);
+  color: #1b1d1f;
+  --ink: #1b1d1f;
+  --muted: rgba(27, 29, 31, 0.72);
   --brand: #1f3b73;
-  --panel: rgba(255, 249, 240, 0.84);
-  --card: rgba(255, 255, 255, 0.75);
+  --brand-soft: rgba(31, 59, 115, 0.1);
+  --panel: rgba(255, 249, 240, 0.86);
+  --card: rgba(255, 255, 255, 0.72);
   --square-light: #f5e8c8;
   --square-dark: #a86d3f;
   --square-selected: #f4b544;
@@ -38,8 +39,8 @@ select {
 
 button {
   border: 0;
-  border-radius: 999px;
-  padding: 0.95rem 1.4rem;
+  border-radius: 18px;
+  padding: 0.95rem 1.3rem;
   cursor: pointer;
   background: var(--brand);
   color: #fff;
@@ -61,17 +62,17 @@ button:disabled {
 }
 
 button.secondary {
-  background: rgba(31, 59, 115, 0.1);
+  background: var(--brand-soft);
   color: var(--brand);
 }
 
 input,
 select {
   width: 100%;
-  border: 1px solid rgba(26, 26, 26, 0.15);
+  border: 1px solid rgba(27, 29, 31, 0.14);
   border-radius: 16px;
   padding: 0.95rem 1rem;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 #root {
@@ -86,31 +87,27 @@ select {
 }
 
 .hero-panel {
-  width: min(100%, 960px);
+  width: min(100%, 1200px);
   background: var(--panel);
-  border: 1px solid rgba(26, 26, 26, 0.08);
+  border: 1px solid rgba(27, 29, 31, 0.08);
   border-radius: 28px;
   padding: 2rem;
   box-shadow: 0 28px 70px rgba(54, 35, 13, 0.14);
   backdrop-filter: blur(14px);
 }
 
-.room-panel {
-  width: min(100%, 1280px);
-}
-
-.room-layout {
+.hero-copy,
+.room-copy {
   display: grid;
-  gap: 1.5rem;
-  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 1rem;
 }
 
 .eyebrow {
   display: inline-flex;
-  margin-bottom: 0.75rem;
+  width: fit-content;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  background: rgba(31, 59, 115, 0.08);
+  background: var(--brand-soft);
   color: var(--brand);
   font-size: 0.85rem;
   font-weight: 700;
@@ -118,113 +115,132 @@ select {
   text-transform: uppercase;
 }
 
-h1 {
-  margin: 0;
-  max-width: 12ch;
-  font-size: clamp(2.8rem, 7vw, 5.6rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
-}
-
-.room-panel h1 {
-  max-width: none;
-  font-size: clamp(2.1rem, 5vw, 3.8rem);
-}
-
+h1,
 h2 {
   margin: 0;
 }
 
-.lede {
-  margin: 1rem 0 0;
-  max-width: 62ch;
-  color: rgba(26, 26, 26, 0.76);
-  font-size: 1.05rem;
-  line-height: 1.6;
+h1 {
+  max-width: 12ch;
+  font-size: clamp(2.8rem, 7vw, 5.2rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
 }
 
-.cta-row,
-.room-actions,
-.setup-actions {
-  display: flex;
-  gap: 0.9rem;
-  margin-top: 1.5rem;
-  flex-wrap: wrap;
+.room-layout h1 {
+  max-width: none;
+  font-size: clamp(2.1rem, 5vw, 3.8rem);
 }
 
-.join-form {
-  margin-top: 1.75rem;
-}
-
-.join-form label,
-.setup-panel label {
-  display: block;
-  margin-bottom: 0.65rem;
-  font-weight: 600;
-}
-
-.join-input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-}
-
-.feature-grid,
-.stats-grid,
-.seat-grid {
-  display: grid;
-  gap: 1rem;
-  margin-top: 1.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.feature-card,
-.stat-card,
-.seat-card,
-.clock-card,
-.setup-panel,
-.move-list,
-.board-panel {
-  padding: 1.1rem;
-  border-radius: 20px;
-  background: var(--card);
-  border: 1px solid rgba(26, 26, 26, 0.06);
-}
-
-.feature-card h2,
-.stat-card strong,
-.stat-card span,
-.seat-card strong,
-.seat-card span,
-.clock-card span,
-.clock-card strong {
-  display: block;
-}
-
-.feature-card h2,
-.move-list h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-
-.feature-card p,
-.stat-card span,
-.meta-line,
+.lede,
+.panel-card p,
+.game-card p,
 .status-line,
 .error-line,
-.seat-card small,
 .move-list p,
 .move-list li {
   margin: 0;
   color: var(--muted);
+  line-height: 1.6;
 }
 
+.game-grid,
+.lobby-grid,
+.stats-grid,
+.seat-grid,
+.board-meta,
+.setup-row,
+.board-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.game-grid {
+  margin-top: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.game-card,
+.panel-card,
+.stat-card,
+.seat-card,
+.clock-card,
+.setup-panel,
+.move-list {
+  padding: 1.1rem;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid rgba(27, 29, 31, 0.06);
+}
+
+.game-card {
+  text-align: left;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.game-card.selected {
+  outline: 2px solid rgba(31, 59, 115, 0.35);
+}
+
+.game-card span,
+.stat-card span,
+.seat-card span,
+.clock-card span {
+  display: block;
+  color: var(--muted);
+}
+
+.game-card strong,
 .stat-card strong,
 .seat-card strong,
 .clock-card strong {
-  margin-top: 0.45rem;
-  font-size: 1.5rem;
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.3rem;
   color: var(--ink);
+}
+
+.lobby-grid {
+  margin-top: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.join-form,
+.setup-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.join-input-row,
+.room-actions,
+.setup-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.join-input-row input {
+  flex: 1;
+}
+
+.room-shell .hero-panel {
+  width: min(100%, 1320px);
+}
+
+.room-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.board-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.board-meta {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .clock-card.active {
@@ -232,54 +248,27 @@ h2 {
   border-color: rgba(168, 109, 63, 0.22);
 }
 
-.setup-panel {
-  margin-top: 1.5rem;
-}
-
-.setup-row {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.meta-line,
-.status-line,
-.error-line {
-  margin-top: 1rem;
-}
-
-.error-line {
-  color: #9e2b25;
-}
-
 .board-panel {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-}
-
-.clock-row {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
 }
 
 .board-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  border-radius: 20px;
   overflow: hidden;
-  border-radius: 24px;
-  border: 6px solid rgba(84, 54, 30, 0.9);
-  box-shadow: 0 20px 50px rgba(54, 35, 13, 0.18);
+  border: 1px solid rgba(27, 29, 31, 0.1);
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .board-square {
+  aspect-ratio: 1;
+  border-radius: 0;
+  padding: 0.4rem;
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 1 / 1;
-  padding: 0;
-  border-radius: 0;
   color: var(--ink);
 }
 
@@ -289,28 +278,32 @@ h2 {
 
 .board-square.dark {
   background: var(--square-dark);
-  color: #fff6e8;
 }
 
 .board-square.selected {
-  box-shadow: inset 0 0 0 5px var(--square-selected);
+  background: var(--square-selected);
 }
 
-.board-square.target {
-  box-shadow: inset 0 0 0 5px var(--square-target);
-}
-
-.square-piece {
-  font-size: clamp(1.8rem, 3vw, 2.8rem);
-  line-height: 1;
+.board-square.target::after {
+  content: "";
+  width: 28%;
+  height: 28%;
+  border-radius: 999px;
+  background: rgba(215, 115, 75, 0.72);
+  position: absolute;
 }
 
 .square-label {
   position: absolute;
-  right: 0.35rem;
-  bottom: 0.3rem;
+  top: 0.35rem;
+  left: 0.45rem;
   font-size: 0.7rem;
-  opacity: 0.65;
+  opacity: 0.8;
+}
+
+.piece-glyph {
+  font-size: clamp(1.45rem, 2vw, 2.5rem);
+  z-index: 1;
 }
 
 .move-list ol {
@@ -319,7 +312,8 @@ h2 {
 }
 
 @media (max-width: 980px) {
-  .room-layout {
+  .room-layout,
+  .board-panel {
     grid-template-columns: 1fr;
   }
 }
@@ -330,13 +324,14 @@ h2 {
   }
 
   .hero-panel {
-    padding: 1.25rem;
-    border-radius: 22px;
+    padding: 1.2rem;
   }
 
-  .join-input-row,
-  .setup-row,
-  .clock-row {
-    grid-template-columns: 1fr;
+  h1 {
+    font-size: clamp(2.3rem, 12vw, 3.8rem);
+  }
+
+  .join-input-row {
+    flex-direction: column;
   }
 }

@@ -2,93 +2,131 @@
 
 ## Goal
 
-The repository is moving away from a single-player local-engine-first prototype and toward a browser-first multiplayer room system hosted on Cloudflare.
+The repo has moved from a single-screen chess room prototype toward a browser-first multiplayer platform where multiple games can share the same room infrastructure.
 
-The first milestone is intentionally narrow:
+The current milestone is:
 
-- a user opens the site
-- the user creates a room
-- the app generates a shareable link
-- a second user opens the same room
-- room state is stored authoritatively on Cloudflare
+- a user opens the homepage
+- the user selects a game
+- the user creates or joins a room
+- room state is hosted authoritatively on Cloudflare
+- game behavior is delegated through a game registry instead of being embedded directly in the room object
 
 ## Current Technical Direction
 
-This scaffold uses:
+This implementation uses:
 
 - React for the browser UI
 - Vite for frontend development and build
 - a Cloudflare Worker for HTTP endpoints
 - a Durable Object named `GameRoom` for per-room state
 - WebSockets for live room updates
+- a shared game registry for dispatching room actions to game modules
+
+## Frontend Structure
+
+The browser app now has two primary modes:
+
+- homepage lobby flow for game selection and room entry
+- room page flow for live room state and game-specific UI
+
+The homepage is responsible for:
+
+- selecting the active `gameKey`
+- creating a new room for that game
+- joining an existing room by room code
+
+The room page is responsible for:
+
+- seat claims
+- displaying generated player names
+- showing room metadata
+- rendering the selected game's interface
+
+## Shared Code Structure
+
+The shared layer is now separated into:
+
+- generic room and player types in `shared/types.ts`
+- player identity generation in `shared/player.ts`
+- game registry glue in `shared/games/index.ts`
+- per-game modules in `shared/games/<game>/`
+
+For chess specifically:
+
+- `logic/types.ts` holds chess-specific state shapes
+- `logic/state.ts` holds initial state construction
+- `behaviors/engine.ts` holds move rules, clocks, and action behavior
+
+This split is the basis for adding future games without rewriting the room lifecycle.
 
 ## Implemented Endpoints
 
-The current scaffold includes:
+The current Worker exposes:
 
 - `GET /api/health`
+- `GET /api/games`
 - `POST /api/rooms`
 - `GET /api/rooms/:roomId`
 - `POST /api/rooms/:roomId/join`
+- `POST /api/rooms/:roomId/configure`
+- `POST /api/rooms/:roomId/start`
+- `POST /api/rooms/:roomId/action`
 - `GET /api/rooms/:roomId/socket`
 
 ## Durable Object Responsibilities
 
-`GameRoom` currently owns:
+`GameRoom` now owns:
 
 - room creation timestamp
-- which browser identity owns the host seat
-- which browser identity owns the guest seat
+- the chosen `gameKey`
+- host and guest seats
+- player display names
 - derived room readiness state
-- fanout of room-state updates to connected browsers
+- generic game configuration and start flow
+- WebSocket fanout for room-state updates
 
-Later it can grow to own:
+Game-specific modules own:
 
-- the actual chess game state
-- move validation
-- turn order
-- reconnection handling
-- WebSocket-based realtime updates
-
-## Why Durable Objects
-
-Durable Objects are a good fit here because each room needs:
-
-- one authoritative state owner
-- stable routing by room ID
-- serialization of room mutations
-- a clean path to realtime communication later
-
-That maps directly to one Durable Object instance per room.
+- initial game state
+- game-specific configuration validation
+- start behavior
+- legal action handling
+- state normalization and timeout refresh
 
 ## Development Flow
 
 1. Install dependencies with `npm install`.
 2. Start local development with `npm run dev`.
 3. Open the local URL from Vite.
-4. Create a room from the landing page.
-5. Open the generated room link in a second browser tab or browser session.
-6. Join from either side and watch the room state update live.
+4. Pick a game from the homepage.
+5. Create a room or open an existing room code.
+6. Join from a second tab or browser session and verify the generated names and room updates.
 
-The current client stores a browser-local player ID in `localStorage`, which lets a refresh reconnect to the same host or guest role.
+The browser client stores a persistent player identity in `localStorage`, including:
+
+- a stable player ID
+- a generated display name
+
+That identity is reused across refreshes so room seats can be reclaimed.
 
 ## Hosting Reality
 
-- `npm run dev` is only a local development server.
-- Shareable public room links require deployment to Cloudflare.
-- GitHub Pages alone cannot host the current backend because the room system depends on Workers and Durable Objects.
+- `npm run dev` is local development only.
+- Public room links require deployment to Cloudflare.
+- GitHub Pages alone cannot host the backend because the room system depends on Workers and Durable Objects.
 
 See [Deployment Notes](deployment.md) for the current hosting model.
 
 ## Near-Term Next Steps
 
-The next useful additions are:
+The next useful expansions are:
 
-1. add actual match state to the `GameRoom` object
-2. define a minimal legal move format and turn model
-3. replace "claim seat by HTTP button" with a more explicit room/game handshake
-4. separate room lifecycle from future game lifecycle concerns
-5. add reconnect and stale-session rules once gameplay exists
+1. add a second game module to prove the registry flow
+2. introduce a lobby metadata view for game-specific room rules
+3. define a clearer spectator experience
+4. add reconnect and stale-session policies
+5. add automated tests around room dispatch and chess actions
 
 ## Relationship To Existing Design Docs
 
@@ -98,4 +136,4 @@ The older `docs/game-design.md` file still contains useful game direction, but i
 - Fairy-Stockfish server integration
 - Raspberry Pi hosting
 
-Those assumptions do not drive this scaffold anymore. They should be treated as archived design notes until the multiplayer direction stabilizes.
+Those assumptions do not drive the current architecture. Treat them as archived design notes until the multiplayer direction stabilizes further.

@@ -1,71 +1,66 @@
+import type { ChessState } from "./games/chess/logic/types";
+
 export type SeatRole = "host" | "guest" | "spectator";
+export type GameKey = "chess";
 
-export type PieceColor = "white" | "black";
-export type PieceRole = "king" | "queen" | "rook" | "bishop" | "knight" | "pawn";
-export type PieceCode = "wk" | "wq" | "wr" | "wb" | "wn" | "wp" | "bk" | "bq" | "br" | "bb" | "bn" | "bp";
-export type BoardState = Array<Array<PieceCode | null>>;
+export type PlayerIdentity = {
+  playerId: string;
+  displayName: string;
+};
 
-export type TimerPreset = 60_000 | 180_000 | 300_000 | 600_000;
-export type MovePrioritySeat = "host" | "guest";
-export type GameStatus = "waiting" | "active" | "checkmate" | "stalemate" | "timeout";
-export type SpecialMove = "castle_king_side" | "castle_queen_side" | "en_passant" | null;
-
-export type CastlingRights = {
-  white: {
-    kingSide: boolean;
-    queenSide: boolean;
-  };
-  black: {
-    kingSide: boolean;
-    queenSide: boolean;
-  };
+export type RoomSeat = {
+  playerId: string | null;
+  displayName: string | null;
 };
 
 export type RoomState = {
   roomId: string;
+  gameKey: GameKey;
   createdAt: string;
-  hostPlayerId: string | null;
-  guestPlayerId: string | null;
+  host: RoomSeat;
+  guest: RoomSeat;
 };
 
 export type RoomSnapshot = RoomState & {
-  hostJoined: boolean;
-  guestJoined: boolean;
   playerCount: number;
   status: "waiting" | "ready";
 };
 
-export type MoveRecord = {
-  from: string;
-  to: string;
-  piece: PieceCode;
-  captured: PieceCode | null;
-  promotion: PieceCode | null;
-  special: SpecialMove;
-  player: PieceColor;
-  movedAt: string;
+export type ChessMoveAction = {
+  type: "move";
+  payload: {
+    from: string;
+    to: string;
+  };
 };
 
-export type ChessState = {
-  status: GameStatus;
-  board: BoardState;
-  hostColor: PieceColor;
-  guestColor: PieceColor;
-  activeColor: PieceColor;
-  movePrioritySeat: MovePrioritySeat;
-  timerMs: TimerPreset;
-  whiteRemainingMs: number;
-  blackRemainingMs: number;
-  turnStartedAt: string | null;
-  winner: PieceColor | null;
-  checkedColor: PieceColor | null;
-  castlingRights: CastlingRights;
-  enPassantTarget: string | null;
-  lastMove: MoveRecord | null;
-  moves: MoveRecord[];
-};
+export type GameAction = ChessMoveAction;
+
+export type AnyGameState = ChessState;
 
 export type RoomPayload = {
   room: RoomSnapshot;
-  game: ChessState;
+  game: AnyGameState;
+};
+
+export type JoinResponse = RoomPayload & {
+  role: SeatRole;
+  playerName: string;
+};
+
+export type GameCatalogEntry = {
+  key: GameKey;
+  name: string;
+  summary: string;
+  accent: string;
+};
+
+export type CreateRoomRequest = {
+  gameKey: GameKey;
+};
+
+export type CreateRoomResponse = {
+  roomId: string;
+  roomUrl: string;
+  gameKey: GameKey;
 };
