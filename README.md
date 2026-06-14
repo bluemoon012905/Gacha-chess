@@ -18,6 +18,7 @@ The repository now contains an initial scaffold for:
 - a `GameRoom` Durable Object
 - room creation and join endpoints
 - realtime room updates over WebSockets
+- browser-local player identity for seat reclaim on refresh
 - documentation for the pivot and local development flow
 
 ## Project Layout
@@ -59,9 +60,38 @@ npm run deploy
 npm run cf-typegen
 ```
 
+## Local Vs Public Use
+
+- `npm run dev` is local development only. It is for previewing the app on your machine while you are building it.
+- Public room links require deployment to Cloudflare because the app depends on a Worker and Durable Objects.
+- GitHub Pages alone is not enough for the current architecture because it cannot run the room API or WebSocket room server.
+
+## Deployment
+
+The intended deployment target is Cloudflare:
+
+- static frontend assets served through the Cloudflare build/deploy flow
+- Worker API deployed with Wrangler
+- `GameRoom` Durable Object bound in the same deployment
+
+Basic deploy flow:
+
+```bash
+npm install
+npm run build
+npm run deploy
+```
+
+You will also need:
+
+- a Cloudflare account
+- Wrangler authentication via `npx wrangler login`
+- a unique Worker name if `gacha-chess` is already taken in your account
+
 ## Documentation
 
 - [Browser Pivot Notes](docs/browser-pivot.md)
+- [Deployment Notes](docs/deployment.md)
 - [Original Game Design Notes](docs/game-design.md)
 
 ## Notes

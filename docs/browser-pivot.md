@@ -20,6 +20,7 @@ This scaffold uses:
 - Vite for frontend development and build
 - a Cloudflare Worker for HTTP endpoints
 - a Durable Object named `GameRoom` for per-room state
+- WebSockets for live room updates
 
 ## Implemented Endpoints
 
@@ -70,6 +71,14 @@ That maps directly to one Durable Object instance per room.
 6. Join from either side and watch the room state update live.
 
 The current client stores a browser-local player ID in `localStorage`, which lets a refresh reconnect to the same host or guest role.
+
+## Hosting Reality
+
+- `npm run dev` is only a local development server.
+- Shareable public room links require deployment to Cloudflare.
+- GitHub Pages alone cannot host the current backend because the room system depends on Workers and Durable Objects.
+
+See [Deployment Notes](deployment.md) for the current hosting model.
 
 ## Near-Term Next Steps
 
