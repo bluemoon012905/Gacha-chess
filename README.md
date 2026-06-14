@@ -1,40 +1,69 @@
 # Gacha-chess
 
-Server-side strategy game built around chess-family pieces, gacha-style progression, and Fairy-Stockfish-driven enemy encounters.
+This repository is now being repurposed from a design-only tactics game concept into a browser-based multiplayer prototype.
 
-## Project Direction
+The first implementation target is:
 
-The game combines:
+- a browser client
+- a Cloudflare Worker backend
+- a Durable Object per room
+- shareable room links for head-to-head play
 
-- staged progression through authored levels
-- collectible and unlockable piece types
-- pre-battle squad and board setup
-- multiple chess-family rulesets over time
-- Fairy-Stockfish as the enemy AI engine
+## Current Status
+
+The repository now contains an initial scaffold for:
+
+- a React + Vite browser client
+- a Cloudflare Worker API
+- a `GameRoom` Durable Object
+- room creation and join endpoints
+- documentation for the pivot and local development flow
+
+## Project Layout
+
+```text
+Gacha-chess/
+├── docs/
+│   ├── browser-pivot.md
+│   └── game-design.md
+├── public/
+├── src/
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── styles.css
+├── worker/
+│   └── index.ts
+├── index.html
+├── package.json
+├── tsconfig.json
+├── tsconfig.worker.json
+├── vite.config.ts
+└── wrangler.jsonc
+```
+
+## Commands
+
+After installing dependencies:
+
+```bash
+npm install
+npm run dev
+```
+
+Useful additional commands:
+
+```bash
+npm run build
+npm run deploy
+npm run cf-typegen
+```
 
 ## Documentation
 
-- [Game Design Overview](docs/game-design.md)
+- [Browser Pivot Notes](docs/browser-pivot.md)
+- [Original Game Design Notes](docs/game-design.md)
 
-## Current Scope
+## Notes
 
-The initial version should stay narrow:
-
-- start with standard chess pieces only
-- player begins with a pawn and a rook unlocked
-- player always moves second
-- levels consist of a predefined series of enemy setups
-- the player must choose a starting formation that can defeat the full encounter sequence
-
-Later expansions can introduce Chinese chess and shogi rulesets after the core loop is stable.
-
-## Hosting Direction
-
-The recommended deployment model is:
-
-- host the game server on a Raspberry Pi
-- run Fairy-Stockfish locally on that same Pi
-- have browser or remote clients talk to the backend only
-- keep the source code in GitHub for version control and backup
-
-The client should not communicate with Fairy-Stockfish directly. The backend should be the only process that talks to the engine.
+- The original single-player Fairy-Stockfish design document is still preserved in `docs/game-design.md`.
+- The Windows Fairy-Stockfish binary is still in the repo, but it is not part of the new browser room scaffold.
