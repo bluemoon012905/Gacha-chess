@@ -17,6 +17,7 @@ The repository now contains an initial scaffold for:
 - a Cloudflare Worker API
 - a `GameRoom` Durable Object
 - room creation and join endpoints
+- realtime room updates over WebSockets
 - documentation for the pivot and local development flow
 
 ## Project Layout

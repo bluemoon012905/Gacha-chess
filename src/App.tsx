@@ -3,6 +3,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type RoomSnapshot = {
   roomId: string;
   createdAt: string;
+  hostPlayerId: string | null;
+  guestPlayerId: string | null;
   hostJoined: boolean;
   guestJoined: boolean;
   playerCount: number;
@@ -13,6 +15,19 @@ type JoinResponse = {
   room: RoomSnapshot;
   role: "host" | "guest" | "spectator";
 };
+
+type RoomSocketMessage =
+  | {
+      type: "room_state";
+      room: RoomSnapshot;
+    }
+  | {
+      type: "pong";
+    }
+  | {
+      type: "error";
+      message: string;
+    };
 
 function getRoomIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/room\/([a-z0-9-]+)$/i);
@@ -26,8 +41,21 @@ function formatTimestamp(value: string): string {
   }).format(new Date(value));
 }
 
+function getOrCreatePlayerId(): string {
+  const storageKey = "gacha-chess-player-id";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const nextValue = crypto.randomUUID();
+  window.localStorage.setItem(storageKey, nextValue);
+  return nextValue;
+}
+
 export default function App() {
   const roomId = useMemo(() => getRoomIdFromPath(window.location.pathname), []);
+  const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [roomState, setRoomState] = useState<RoomSnapshot | null>(null);
   const [joinRole, setJoinRole] = useState<JoinResponse["role"] | null>(null);
   const [joinCode, setJoinCode] = useState("");
@@ -36,10 +64,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!roomState) return;
+
+    if (roomState.hostPlayerId === playerId) {
+      setJoinRole("host");
+      return;
+    }
+
+    if (roomState.guestPlayerId === playerId) {
+      setJoinRole("guest");
+      return;
+    }
+
+    setJoinRole(null);
+  }, [playerId, roomState]);
+
+  useEffect(() => {
     if (!roomId) return;
 
-    let cancelled = false;
     const controller = new AbortController();
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let active = true;
 
     async function loadRoom() {
       try {
@@ -52,11 +98,11 @@ export default function App() {
         }
 
         const payload = (await response.json()) as { room: RoomSnapshot };
-        if (!cancelled) {
+        if (active) {
           setRoomState(payload.room);
         }
       } catch (caught) {
-        if (!cancelled) {
+        if (active) {
           const nextError =
             caught instanceof Error ? caught.message : "Failed to load room.";
           setError(nextError);
@@ -64,13 +110,49 @@ export default function App() {
       }
     }
 
+    function connectSocket() {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(`${protocol}//${window.location.host}/api/rooms/${roomId}/socket`);
+
+      socket.addEventListener("open", () => {
+        setError(null);
+      });
+
+      socket.addEventListener("message", (event) => {
+        try {
+          const payload = JSON.parse(event.data) as RoomSocketMessage;
+          if (payload.type === "room_state") {
+            setRoomState(payload.room);
+            setError(null);
+          } else if (payload.type === "error") {
+            setError(payload.message);
+          }
+        } catch {
+          setError("Received an invalid room update.");
+        }
+      });
+
+      socket.addEventListener("close", () => {
+        if (!active) return;
+        reconnectTimer = window.setTimeout(connectSocket, 1500);
+      });
+
+      socket.addEventListener("error", () => {
+        if (!active) return;
+        setError("Realtime connection interrupted. Reconnecting...");
+      });
+    }
+
     void loadRoom();
-    const intervalId = window.setInterval(() => void loadRoom(), 3000);
+    connectSocket();
 
     return () => {
-      cancelled = true;
+      active = false;
       controller.abort();
-      window.clearInterval(intervalId);
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      socket?.close();
     };
   }, [roomId]);
 
@@ -129,6 +211,9 @@ export default function App() {
     try {
       const response = await fetch(`/api/rooms/${roomId}/join`, {
         method: "POST",
+        headers: {
+          "x-player-id": playerId,
+        },
       });
 
       if (!response.ok) {

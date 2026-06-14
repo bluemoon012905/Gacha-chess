@@ -1,3 +1,5 @@
+import { DurableObject } from "cloudflare:workers";
+
 type Env = {
   ROOMS: DurableObjectNamespace;
 };
@@ -5,11 +7,13 @@ type Env = {
 type RoomState = {
   roomId: string;
   createdAt: string;
-  hostJoined: boolean;
-  guestJoined: boolean;
+  hostPlayerId: string | null;
+  guestPlayerId: string | null;
 };
 
 type RoomSnapshot = RoomState & {
+  hostJoined: boolean;
+  guestJoined: boolean;
   playerCount: number;
   status: "waiting" | "ready";
 };
@@ -29,10 +33,14 @@ function notFound(message = "Not found"): Response {
 }
 
 function roomSnapshotFromState(state: RoomState): RoomSnapshot {
-  const playerCount = Number(state.hostJoined) + Number(state.guestJoined);
+  const hostJoined = state.hostPlayerId !== null;
+  const guestJoined = state.guestPlayerId !== null;
+  const playerCount = Number(hostJoined) + Number(guestJoined);
 
   return {
     ...state,
+    hostJoined,
+    guestJoined,
     playerCount,
     status: playerCount >= 2 ? "ready" : "waiting",
   };
@@ -43,13 +51,9 @@ function generateRoomId(): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-export class GameRoom {
-  private readonly state: DurableObjectState;
-  private readonly env: Env;
-
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
-    this.env = env;
+export class GameRoom extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -71,18 +75,47 @@ export class GameRoom {
 
     if (url.pathname === "/join" && request.method === "POST") {
       try {
-        const result = await this.joinRoom();
+        const playerId = request.headers.get("x-player-id");
+        if (!playerId) {
+          return json({ error: "Missing player identity." }, { status: 400 });
+        }
+
+        const result = await this.joinRoom(playerId);
         return json(result);
       } catch {
         return notFound("Room has not been initialized.");
       }
     }
 
+    if (url.pathname === "/socket" && request.method === "GET") {
+      return this.handleWebSocketUpgrade();
+    }
+
     return notFound("Room endpoint not found.");
   }
 
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== "string") {
+      return;
+    }
+
+    if (message === "ping") {
+      ws.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
+
+    if (message === "sync") {
+      const room = await this.requireRoom();
+      ws.send(JSON.stringify({ type: "room_state", room }));
+    }
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    ws.close(code, reason);
+  }
+
   private async initializeRoom(roomIdParam: string | null): Promise<RoomSnapshot> {
-    const existing = await this.state.storage.get<RoomState>("room");
+    const existing = await this.ctx.storage.get<RoomState>("room");
     if (existing) {
       return roomSnapshotFromState(existing);
     }
@@ -90,16 +123,18 @@ export class GameRoom {
     const room: RoomState = {
       roomId: roomIdParam ?? "unknown",
       createdAt: new Date().toISOString(),
-      hostJoined: false,
-      guestJoined: false,
+      hostPlayerId: null,
+      guestPlayerId: null,
     };
 
-    await this.state.storage.put("room", room);
-    return roomSnapshotFromState(room);
+    await this.ctx.storage.put("room", room);
+    const snapshot = roomSnapshotFromState(room);
+    this.broadcastRoomState(snapshot);
+    return snapshot;
   }
 
   private async requireRoom(): Promise<RoomSnapshot> {
-    const room = await this.state.storage.get<RoomState>("room");
+    const room = await this.ctx.storage.get<RoomState>("room");
     if (!room) {
       throw new Error("Room has not been initialized.");
     }
@@ -107,31 +142,66 @@ export class GameRoom {
     return roomSnapshotFromState(room);
   }
 
-  private async joinRoom(): Promise<{
+  private async joinRoom(playerId: string): Promise<{
     room: RoomSnapshot;
     role: "host" | "guest" | "spectator";
   }> {
-    const room = await this.state.storage.get<RoomState>("room");
+    const room = await this.ctx.storage.get<RoomState>("room");
     if (!room) {
       throw new Error("Room has not been initialized.");
     }
 
     let role: "host" | "guest" | "spectator" = "spectator";
 
-    if (!room.hostJoined) {
-      room.hostJoined = true;
+    if (room.hostPlayerId === playerId) {
       role = "host";
-    } else if (!room.guestJoined) {
-      room.guestJoined = true;
+    } else if (room.guestPlayerId === playerId) {
+      role = "guest";
+    } else if (!room.hostPlayerId) {
+      room.hostPlayerId = playerId;
+      role = "host";
+    } else if (!room.guestPlayerId) {
+      room.guestPlayerId = playerId;
       role = "guest";
     }
 
-    await this.state.storage.put("room", room);
+    await this.ctx.storage.put("room", room);
+    const snapshot = roomSnapshotFromState(room);
+    this.broadcastRoomState(snapshot);
 
     return {
-      room: roomSnapshotFromState(room),
+      room: snapshot,
       role,
     };
+  }
+
+  private handleWebSocketUpgrade(): Response {
+    const webSocketPair = new WebSocketPair();
+    const [client, server] = Object.values(webSocketPair);
+
+    this.ctx.acceptWebSocket(server);
+    void this.sendCurrentState(server);
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  private async sendCurrentState(ws: WebSocket): Promise<void> {
+    try {
+      const room = await this.requireRoom();
+      ws.send(JSON.stringify({ type: "room_state", room }));
+    } catch {
+      ws.send(JSON.stringify({ type: "error", message: "Room has not been initialized." }));
+    }
+  }
+
+  private broadcastRoomState(room: RoomSnapshot): void {
+    const payload = JSON.stringify({ type: "room_state", room });
+    for (const socket of this.ctx.getWebSockets()) {
+      socket.send(payload);
+    }
   }
 }
 
@@ -182,10 +252,17 @@ export default {
     const joinRouteMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/join$/i);
     if (joinRouteMatch && request.method === "POST") {
       const roomId = joinRouteMatch[1];
+      const playerId = request.headers.get("x-player-id");
+      if (!playerId) {
+        return json({ error: "Missing player identity." }, { status: 400 });
+      }
       const durableId = env.ROOMS.idFromName(roomId);
       const stub = env.ROOMS.get(durableId);
       const response = await stub.fetch("https://room.internal/join", {
         method: "POST",
+        headers: {
+          "x-player-id": playerId,
+        },
       });
 
       if (!response.ok) {
@@ -193,6 +270,17 @@ export default {
       }
 
       return response;
+    }
+
+    const socketRouteMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/socket$/i);
+    if (socketRouteMatch && request.method === "GET") {
+      const roomId = socketRouteMatch[1];
+      const durableId = env.ROOMS.idFromName(roomId);
+      const stub = env.ROOMS.get(durableId);
+
+      return stub.fetch("https://room.internal/socket", {
+        headers: request.headers,
+      });
     }
 
     return notFound();

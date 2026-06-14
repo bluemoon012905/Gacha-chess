@@ -29,15 +29,17 @@ The current scaffold includes:
 - `POST /api/rooms`
 - `GET /api/rooms/:roomId`
 - `POST /api/rooms/:roomId/join`
+- `GET /api/rooms/:roomId/socket`
 
 ## Durable Object Responsibilities
 
 `GameRoom` currently owns:
 
 - room creation timestamp
-- whether a host seat has been claimed
-- whether a guest seat has been claimed
+- which browser identity owns the host seat
+- which browser identity owns the guest seat
 - derived room readiness state
+- fanout of room-state updates to connected browsers
 
 Later it can grow to own:
 
@@ -65,16 +67,19 @@ That maps directly to one Durable Object instance per room.
 3. Open the local URL from Vite.
 4. Create a room from the landing page.
 5. Open the generated room link in a second browser tab or browser session.
+6. Join from either side and watch the room state update live.
+
+The current client stores a browser-local player ID in `localStorage`, which lets a refresh reconnect to the same host or guest role.
 
 ## Near-Term Next Steps
 
 The next useful additions are:
 
-1. add WebSocket connections so room updates push immediately instead of polling
-2. introduce persistent player identity per browser session
-3. add actual match state to the `GameRoom` object
-4. define a minimal legal move format and turn model
-5. separate room lifecycle from future game lifecycle concerns
+1. add actual match state to the `GameRoom` object
+2. define a minimal legal move format and turn model
+3. replace "claim seat by HTTP button" with a more explicit room/game handshake
+4. separate room lifecycle from future game lifecycle concerns
+5. add reconnect and stale-session rules once gameplay exists
 
 ## Relationship To Existing Design Docs
 
