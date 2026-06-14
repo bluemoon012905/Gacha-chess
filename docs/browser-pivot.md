@@ -128,6 +128,16 @@ The next useful expansions are:
 4. add reconnect and stale-session policies
 5. add automated tests around room dispatch and chess actions
 
+## Future Games TODO
+
+Planned games to add later:
+
+- Guessing Chess
+- Rule set will be provided later by you and is waiting on upload
+- Find 14
+- 5-10-King
+- Fight the Landlord
+
 ## Relationship To Existing Design Docs
 
 The older `docs/game-design.md` file still contains useful game direction, but it assumes:
