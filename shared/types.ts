@@ -1,0 +1,56 @@
+export type SeatRole = "host" | "guest" | "spectator";
+
+export type PieceColor = "white" | "black";
+export type PieceRole = "king" | "queen" | "rook" | "bishop" | "knight" | "pawn";
+export type PieceCode = "wk" | "wq" | "wr" | "wb" | "wn" | "wp" | "bk" | "bq" | "br" | "bb" | "bn" | "bp";
+export type BoardState = Array<Array<PieceCode | null>>;
+
+export type TimerPreset = 60_000 | 180_000 | 300_000 | 600_000;
+export type MovePrioritySeat = "host" | "guest";
+export type GameStatus = "waiting" | "active" | "checkmate" | "stalemate" | "timeout";
+
+export type RoomState = {
+  roomId: string;
+  createdAt: string;
+  hostPlayerId: string | null;
+  guestPlayerId: string | null;
+};
+
+export type RoomSnapshot = RoomState & {
+  hostJoined: boolean;
+  guestJoined: boolean;
+  playerCount: number;
+  status: "waiting" | "ready";
+};
+
+export type MoveRecord = {
+  from: string;
+  to: string;
+  piece: PieceCode;
+  captured: PieceCode | null;
+  promotion: PieceCode | null;
+  player: PieceColor;
+  movedAt: string;
+};
+
+export type ChessState = {
+  status: GameStatus;
+  board: BoardState;
+  hostColor: PieceColor;
+  guestColor: PieceColor;
+  activeColor: PieceColor;
+  movePrioritySeat: MovePrioritySeat;
+  timerMs: TimerPreset;
+  whiteRemainingMs: number;
+  blackRemainingMs: number;
+  turnStartedAt: string | null;
+  winner: PieceColor | null;
+  checkedColor: PieceColor | null;
+  lastMove: MoveRecord | null;
+  moves: MoveRecord[];
+};
+
+export type RoomPayload = {
+  room: RoomSnapshot;
+  game: ChessState;
+};

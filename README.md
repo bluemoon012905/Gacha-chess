@@ -93,7 +93,8 @@ You will also need:
 1. Create a Cloudflare account if you do not already have one.
 2. Run `npx wrangler login` on your machine.
 3. Complete the browser-based authorization flow.
-4. Return here and tell me the login completed.
+4. Open the Cloudflare Workers dashboard once if this is the first Worker on the account so Cloudflare can create the account's `workers.dev` subdomain.
+5. Run `npm run deploy`.
 
 Do not paste Cloudflare tokens, cookies, or other secrets into chat. If you want me to verify progress, paste only the non-secret command output or tell me the login succeeded.
 

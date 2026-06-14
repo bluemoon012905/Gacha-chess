@@ -65,17 +65,34 @@ That gives you a local browser session for development and manual testing.
 1. Install dependencies.
 2. Authenticate Wrangler.
 3. Verify the Worker name in `wrangler.jsonc`.
-4. Build the project.
-5. Deploy the Worker and assets.
+4. Ensure the Cloudflare account has a `workers.dev` subdomain.
+5. Build the project.
+6. Deploy the Worker and assets.
 
 Commands:
 
 ```bash
 npm install
 npx wrangler login
+# one-time account bootstrap: open the Workers dashboard if you have never used Workers before
 npm run build
 npm run deploy
 ```
+
+The deploy command should target the generated Worker bundle config emitted by
+the Cloudflare Vite plugin:
+
+```bash
+wrangler deploy --config dist/gacha_chess/wrangler.json
+```
+
+Using the generated config matters because it includes the built Worker entry
+and the frontend asset directory produced during `vite build`.
+
+If deployment fails with Cloudflare error `10063`, the account has not finished
+Workers onboarding yet. Open the Cloudflare dashboard, visit the Workers area,
+and let Cloudflare create the account's `workers.dev` subdomain once. After
+that, rerun `npm run deploy`.
 
 ## Current Config Files
 
