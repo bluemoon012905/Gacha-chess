@@ -1,5 +1,11 @@
 import type { GameCatalogEntry, GameAction, PlayerIdentity, RoomState, SeatRole } from "../../types";
-import type { CardRank, CardSuit, FourteenPointsState, PlayingCard } from "./logic/types";
+import type {
+  CardRank,
+  CardSuit,
+  FourteenPointsLastMove,
+  FourteenPointsState,
+  PlayingCard,
+} from "./logic/types";
 
 export const FOURTEEN_POINTS_GAME_META: GameCatalogEntry = {
   key: "fourteen-points",
@@ -52,6 +58,8 @@ export function createFourteenPointsGameState(): FourteenPointsState {
     guestScore: 0,
     winner: null,
     lastAction: null,
+    lastMove: null,
+    moveCounter: 0,
   };
 }
 
@@ -77,6 +85,8 @@ export function startFourteenPointsGame(_: FourteenPointsState): FourteenPointsS
     guestScore: 0,
     winner: null,
     lastAction: "Game started. Host acts first.",
+    lastMove: null,
+    moveCounter: 0,
   };
 }
 
@@ -125,6 +135,8 @@ export function normalizeFourteenPointsState(state: FourteenPointsState): Fourte
     guestScore: state.guestScore ?? scoreCards(state.guestCaptured ?? []),
     winner: state.winner ?? null,
     lastAction: state.lastAction ?? null,
+    lastMove: state.lastMove ?? null,
+    moveCounter: state.moveCounter ?? 0,
     activeSeat: state.activeSeat ?? "host",
     turnPhase: state.turnPhase ?? "action",
     discardSource: state.discardSource ?? null,
@@ -164,6 +176,23 @@ export function chooseFourteenPointsAiAction(
 
 export function scoreCards(cards: PlayingCard[]): number {
   return cards.reduce((total, card) => total + card.score, 0);
+}
+
+function buildLastMove(
+  id: number,
+  actor: "host" | "guest",
+  type: "capture" | "discard",
+  handCard: PlayingCard,
+  openCards: PlayingCard[],
+): FourteenPointsLastMove {
+  return {
+    id,
+    actor,
+    type,
+    handCard,
+    openCards,
+    total: type === "capture" ? handCard.value + openCards.reduce((sum, card) => sum + card.value, 0) : null,
+  };
 }
 
 function applyCapture(
@@ -224,6 +253,8 @@ function applyCapture(
             hostHand: [...nextState.hostHand, ...drawn],
             turnPhase: "discard",
             discardSource: "capture",
+            lastMove: buildLastMove(nextState.moveCounter + 1, seat, "capture", handCard, openSelection),
+            moveCounter: nextState.moveCounter + 1,
             lastAction: `${seat} captured ${openSelection.length + 1} cards for 14 and drew ${drawn.length} card${drawn.length === 1 ? "" : "s"}. Choose 1 to place into the open.`,
           }
         : {
@@ -232,6 +263,8 @@ function applyCapture(
             guestHand: [...nextState.guestHand, ...drawn],
             turnPhase: "discard",
             discardSource: "capture",
+            lastMove: buildLastMove(nextState.moveCounter + 1, seat, "capture", handCard, openSelection),
+            moveCounter: nextState.moveCounter + 1,
             lastAction: `${seat} captured ${openSelection.length + 1} cards for 14 and drew ${drawn.length} card${drawn.length === 1 ? "" : "s"}. Choose 1 to place into the open.`,
           };
     }
@@ -246,6 +279,8 @@ function applyCapture(
     activeSeat: otherSeat(seat),
     turnPhase: "action",
     discardSource: null,
+    lastMove: buildLastMove(nextState.moveCounter + 1, seat, "capture", handCard, openSelection),
+    moveCounter: nextState.moveCounter + 1,
     lastAction: `${seat} captured ${openSelection.length + 1} cards for 14.`,
   };
 }
@@ -323,6 +358,8 @@ function applyDiscardToOpen(
 
   return {
     ...updateScores(nextState),
+    lastMove: buildLastMove(state.moveCounter + 1, seat, "discard", discardCard, []),
+    moveCounter: state.moveCounter + 1,
     lastAction:
       state.discardSource === "capture"
         ? `${seat} placed ${discardCard.shortLabel} into the open after the capture draw.`

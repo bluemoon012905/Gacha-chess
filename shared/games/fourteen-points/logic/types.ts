@@ -27,6 +27,15 @@ export type PlayingCard = {
   shortLabel: string;
 };
 
+export type FourteenPointsLastMove = {
+  id: number;
+  actor: Extract<SeatRole, "host" | "guest">;
+  type: "capture" | "discard";
+  handCard: PlayingCard;
+  openCards: PlayingCard[];
+  total: number | null;
+};
+
 export type FourteenPointsState = {
   key: "fourteen-points";
   status: "waiting" | "active" | "complete";
@@ -43,4 +52,6 @@ export type FourteenPointsState = {
   guestScore: number;
   winner: Extract<SeatRole, "host" | "guest"> | "tie" | null;
   lastAction: string | null;
+  lastMove: FourteenPointsLastMove | null;
+  moveCounter: number;
 };
