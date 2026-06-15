@@ -346,9 +346,17 @@ h1 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.room-layout.pregame-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .room-sidebar {
   position: sticky;
   top: 2rem;
+}
+
+.room-layout.pregame-layout .room-sidebar {
+  position: static;
 }
 
 .room-stage {

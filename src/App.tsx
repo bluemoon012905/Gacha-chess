@@ -411,7 +411,7 @@ function RoomPage({
 
   return (
     <main className="app-shell room-shell">
-      <section className={`hero-panel room-layout ${hasGameStarted ? "play-layout" : ""}`}>
+      <section className={`hero-panel room-layout ${hasGameStarted ? "play-layout" : "pregame-layout"}`}>
         {!hasGameStarted ? (
           <div className="room-copy room-sidebar">
             <div className="page-marker">
@@ -752,8 +752,9 @@ function RoomPage({
           </div>
         ) : null}
 
-        <div className="room-stage">
-          {hasGameStarted ? (
+        {hasGameStarted || !roomState ? (
+          <div className="room-stage">
+            {hasGameStarted ? (
             <div className="play-header">
               <div className="page-marker">
                 <span className="eyebrow">{gameMeta?.accent ?? "Game"}</span>
@@ -769,49 +770,41 @@ function RoomPage({
               {message ? <p className="status-line">{message}</p> : null}
               {error ? <p className="error-line">{error}</p> : null}
             </div>
-          ) : null}
+            ) : null}
 
-          {hasGameStarted && chessState ? (
-            <ChessRoomView
-              game={chessState}
-              joinRole={joinRole}
-              onAction={onMove}
-              pending={gameActionPending}
-            />
-          ) : hasGameStarted && fourteenPointsState ? (
-            <FourteenPointsRoomView
-              game={fourteenPointsState}
-              joinRole={joinRole}
-              onCapture={onCapture}
-              onDiscardToOpen={onDiscardToOpen}
-              onDrawCard={onDrawCard}
-              pending={gameActionPending}
-            />
-          ) : hasGameStarted && fiveTenKingState ? (
-            <FiveTenKingRoomView
-              game={fiveTenKingState}
-              joinRole={joinRole}
-              onIntersect={onIntersectFiveTenKing}
-              onPass={onPassFiveTenKing}
-              onPlayCards={onPlayFiveTenKingCards}
-              pending={gameActionPending}
-            />
-          ) : roomState ? (
-            <section className="panel-card pregame-stage">
-              <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
-              <h2>Room lobby</h2>
-              <p>
-                Seats, host controls, and match settings stay on the left. The game surface will
-                appear here once the match starts.
-              </p>
-            </section>
-          ) : (
-            <section className="panel-card">
-              <h2>Loading room</h2>
-              <p>Waiting for room state from the Worker.</p>
-            </section>
-          )}
-        </div>
+            {hasGameStarted && chessState ? (
+              <ChessRoomView
+                game={chessState}
+                joinRole={joinRole}
+                onAction={onMove}
+                pending={gameActionPending}
+              />
+            ) : hasGameStarted && fourteenPointsState ? (
+              <FourteenPointsRoomView
+                game={fourteenPointsState}
+                joinRole={joinRole}
+                onCapture={onCapture}
+                onDiscardToOpen={onDiscardToOpen}
+                onDrawCard={onDrawCard}
+                pending={gameActionPending}
+              />
+            ) : hasGameStarted && fiveTenKingState ? (
+              <FiveTenKingRoomView
+                game={fiveTenKingState}
+                joinRole={joinRole}
+                onIntersect={onIntersectFiveTenKing}
+                onPass={onPassFiveTenKing}
+                onPlayCards={onPlayFiveTenKingCards}
+                pending={gameActionPending}
+              />
+            ) : (
+              <section className="panel-card">
+                <h2>Loading room</h2>
+                <p>Waiting for room state from the Worker.</p>
+              </section>
+            )}
+          </div>
+        ) : null}
       </section>
     </main>
   );
