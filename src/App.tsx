@@ -214,6 +214,7 @@ function RoomPage({
   isMember,
   playerName,
   pending,
+  gameActionPending,
   message,
   error,
   configTimer,
@@ -237,6 +238,7 @@ function RoomPage({
   isMember: boolean;
   playerName: string;
   pending: boolean;
+  gameActionPending: boolean;
   message: string | null;
   error: string | null;
   configTimer: TimerPreset;
@@ -547,7 +549,7 @@ function RoomPage({
               game={chessState}
               joinRole={joinRole}
               onAction={onMove}
-              pending={pending}
+              pending={gameActionPending}
             />
           ) : hasGameStarted && fourteenPointsState ? (
             <FourteenPointsRoomView
@@ -555,7 +557,7 @@ function RoomPage({
               joinRole={joinRole}
               onCapture={onCapture}
               onDrawAndDiscard={onDrawAndDiscard}
-              pending={pending}
+              pending={gameActionPending}
             />
           ) : roomState ? (
             <section className="panel-card pregame-stage">
@@ -586,6 +588,7 @@ export default function App() {
   const [roomState, setRoomState] = useState<RoomSnapshot | null>(null);
   const [gameState, setGameState] = useState<AnyGameState | null>(null);
   const [pending, setPending] = useState(false);
+  const [gameActionPending, setGameActionPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createTimer, setCreateTimer] = useState<TimerPreset>(300_000);
@@ -625,9 +628,11 @@ export default function App() {
         setRoomState(payload.room);
         setGameState(payload.game as AnyGameState);
         setSelectedGame(payload.room.gameKey);
+        setGameActionPending(false);
         setError(null);
       } catch (caught) {
         if (!active) return;
+        setGameActionPending(false);
         setError(caught instanceof Error ? caught.message : "Failed to load room.");
       }
     }
@@ -647,11 +652,14 @@ export default function App() {
             setRoomState(payload.room);
             setGameState(payload.game as AnyGameState);
             setSelectedGame(payload.room.gameKey);
+            setGameActionPending(false);
             setError(null);
           } else if (payload.type === "error") {
+            setGameActionPending(false);
             setError(payload.message);
           }
         } catch {
+          setGameActionPending(false);
           setError("Received an invalid room update.");
         }
       });
@@ -868,7 +876,7 @@ export default function App() {
   async function sendAction(action: GameAction) {
     if (!roomId) return;
 
-    setPending(true);
+    setGameActionPending(true);
     setError(null);
     setMessage(null);
 
@@ -893,7 +901,7 @@ export default function App() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Action failed.");
     } finally {
-      setPending(false);
+      setGameActionPending(false);
     }
   }
 
@@ -942,6 +950,7 @@ export default function App() {
       configTimer={configTimer}
       error={error}
       gameState={gameState}
+      gameActionPending={gameActionPending}
       isMember={isMember}
       isRoomHost={isRoomHost}
       joinRole={joinRole}

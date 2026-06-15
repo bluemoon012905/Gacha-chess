@@ -30,6 +30,14 @@ function squareLabel(row: number, col: number): string {
   return `${"abcdefgh"[col]}${8 - row}`;
 }
 
+function fileLabel(col: number): string {
+  return "abcdefgh"[col];
+}
+
+function rankLabel(row: number): string {
+  return String(8 - row);
+}
+
 function getPieceCode(board: BoardState, square: string): PieceCode | null {
   const file = "abcdefgh".indexOf(square[0]);
   const rank = Number(square[1]);
@@ -176,6 +184,8 @@ export function ChessRoomView({ game, joinRole, pending, onAction }: Props) {
               const isLight = (rowIndex + colIndex) % 2 === 0;
               const isSelected = selectedSquare === square;
               const isTarget = legalTargets.includes(square);
+              const showFileLabel = rowIndex === displayRows[displayRows.length - 1];
+              const showRankLabel = colIndex === displayCols[0];
 
               return (
                 <button
@@ -192,7 +202,8 @@ export function ChessRoomView({ game, joinRole, pending, onAction }: Props) {
                   onClick={() => void handleSquareClick(square)}
                   type="button"
                 >
-                  <span className="square-label">{square}</span>
+                  {showFileLabel ? <span className="square-file-label">{fileLabel(colIndex)}</span> : null}
+                  {showRankLabel ? <span className="square-rank-label">{rankLabel(rowIndex)}</span> : null}
                   {piece ? (
                     <img
                       alt={piece}

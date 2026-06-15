@@ -427,6 +427,10 @@ h1 {
   transform: none;
 }
 
+.board-square:disabled {
+  opacity: 1;
+}
+
 .board-square.light {
   background: var(--square-light);
 }
@@ -448,12 +452,23 @@ h1 {
   position: absolute;
 }
 
-.square-label {
+.square-file-label,
+.square-rank-label {
   position: absolute;
-  top: 0.32rem;
-  left: 0.42rem;
   font-size: 0.68rem;
   opacity: 0.82;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.square-file-label {
+  right: 0.38rem;
+  bottom: 0.28rem;
+}
+
+.square-rank-label {
+  top: 0.32rem;
+  left: 0.42rem;
 }
 
 .piece-asset {
