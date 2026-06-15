@@ -16,7 +16,7 @@ export type PieceCode =
 export type BoardState = Array<Array<PieceCode | null>>;
 
 export type TimerPreset = 60_000 | 180_000 | 300_000 | 600_000;
-export type MovePrioritySeat = "host" | "guest";
+export type HostColorChoice = PieceColor;
 export type GameStatus = "waiting" | "active" | "checkmate" | "stalemate" | "timeout";
 export type SpecialMove = "castle_king_side" | "castle_queen_side" | "en_passant" | null;
 
@@ -49,7 +49,6 @@ export type ChessState = {
   hostColor: PieceColor;
   guestColor: PieceColor;
   activeColor: PieceColor;
-  movePrioritySeat: MovePrioritySeat;
   timerMs: TimerPreset;
   whiteRemainingMs: number;
   blackRemainingMs: number;

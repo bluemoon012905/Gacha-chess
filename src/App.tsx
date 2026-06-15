@@ -4,7 +4,7 @@ import { ChessRoomView } from "./games/chess/ChessRoomView";
 import { getOrCreatePlayerIdentity } from "./lib/player";
 import { getRoomIdFromPath } from "./lib/routes";
 import { GAME_CATALOG, getGameCatalogEntry } from "../shared/games";
-import type { ChessState, MovePrioritySeat, TimerPreset } from "../shared/chess";
+import type { ChessState, HostColorChoice, TimerPreset } from "../shared/chess";
 import type {
   CreateRoomResponse,
   GameAction,
@@ -27,9 +27,9 @@ const TIMER_OPTIONS: Array<{ value: TimerPreset; label: string }> = [
   { value: 600_000, label: "10 minutes" },
 ];
 
-const PRIORITY_OPTIONS: Array<{ value: MovePrioritySeat; label: string }> = [
-  { value: "host", label: "Host moves first" },
-  { value: "guest", label: "Guest moves first" },
+const COLOR_OPTIONS: Array<{ value: HostColorChoice; label: string }> = [
+  { value: "white", label: "Play white" },
+  { value: "black", label: "Play black" },
 ];
 
 function getSeatRole(room: RoomSnapshot | null, playerId: string): SeatRole {
@@ -52,8 +52,12 @@ function HomePage({
   pending,
   message,
   error,
+  createTimer,
+  createHostColor,
   onGameSelect,
   onJoinCodeChange,
+  onCreateTimerChange,
+  onCreateHostColorChange,
   onCreateRoom,
   onJoinRoom,
 }: {
@@ -62,8 +66,12 @@ function HomePage({
   pending: boolean;
   message: string | null;
   error: string | null;
+  createTimer: TimerPreset;
+  createHostColor: HostColorChoice;
   onGameSelect: (value: GameKey) => void;
   onJoinCodeChange: (value: string) => void;
+  onCreateTimerChange: (value: TimerPreset) => void;
+  onCreateHostColorChange: (value: HostColorChoice) => void;
   onCreateRoom: () => Promise<void>;
   onJoinRoom: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -99,6 +107,40 @@ function HomePage({
           <section className="panel-card">
             <h2>Start a room</h2>
             <p>Launch a new room for {getGameCatalogEntry(gameKey).name}.</p>
+            {gameKey === "chess" ? (
+              <div className="join-form">
+                <label>
+                  Your color
+                  <select
+                    disabled={pending}
+                    onChange={(event) =>
+                      onCreateHostColorChange(event.target.value as HostColorChoice)
+                    }
+                    value={createHostColor}
+                  >
+                    {COLOR_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Time control
+                  <select
+                    disabled={pending}
+                    onChange={(event) => onCreateTimerChange(Number(event.target.value) as TimerPreset)}
+                    value={createTimer}
+                  >
+                    {TIMER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
             <button disabled={pending} onClick={() => void onCreateRoom()} type="button">
               {pending ? "Starting..." : "Create room"}
             </button>
@@ -140,11 +182,11 @@ function RoomPage({
   message,
   error,
   configTimer,
-  configPriority,
+  configHostColor,
   onClaimSeat,
   onSaveConfiguration,
   onTimerChange,
-  onPriorityChange,
+  onHostColorChange,
   onStartGame,
   onCopyInvite,
   onMove,
@@ -158,11 +200,11 @@ function RoomPage({
   message: string | null;
   error: string | null;
   configTimer: TimerPreset;
-  configPriority: MovePrioritySeat;
+  configHostColor: HostColorChoice;
   onClaimSeat: () => Promise<void>;
   onSaveConfiguration: () => Promise<void>;
   onTimerChange: (value: TimerPreset) => void;
-  onPriorityChange: (value: MovePrioritySeat) => void;
+  onHostColorChange: (value: HostColorChoice) => void;
   onStartGame: () => Promise<void>;
   onCopyInvite: () => Promise<void>;
   onMove: (from: string, to: string) => Promise<void>;
@@ -201,11 +243,17 @@ function RoomPage({
           <div className="seat-grid">
             <article className="seat-card">
               <span>Host</span>
-              <strong>{roomState?.host.displayName ?? "Open seat"}</strong>
+              <strong>
+                {roomState?.host.displayName ?? "Open seat"}
+                {gameState ? ` · ${gameState.hostColor}` : ""}
+              </strong>
             </article>
             <article className="seat-card">
               <span>Guest</span>
-              <strong>{roomState?.guest.displayName ?? "Open seat"}</strong>
+              <strong>
+                {roomState?.guest.displayName ?? "Open seat"}
+                {gameState ? ` · ${gameState.guestColor}` : ""}
+              </strong>
             </article>
           </div>
 
@@ -237,15 +285,13 @@ function RoomPage({
                 </label>
 
                 <label>
-                  First move
+                  Host color
                   <select
                     disabled={joinRole !== "host" || gameState.status === "active" || pending}
-                    onChange={(event) =>
-                      onPriorityChange(event.target.value as MovePrioritySeat)
-                    }
-                    value={configPriority}
+                    onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
+                    value={configHostColor}
                   >
-                    {PRIORITY_OPTIONS.map((option) => (
+                    {COLOR_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -308,14 +354,16 @@ export default function App() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createTimer, setCreateTimer] = useState<TimerPreset>(300_000);
+  const [createHostColor, setCreateHostColor] = useState<HostColorChoice>("white");
   const [configTimer, setConfigTimer] = useState<TimerPreset>(300_000);
-  const [configPriority, setConfigPriority] = useState<MovePrioritySeat>("host");
+  const [configHostColor, setConfigHostColor] = useState<HostColorChoice>("white");
   const joinRole = getSeatRole(roomState, player.playerId);
 
   useEffect(() => {
     if (!gameState) return;
     setConfigTimer(gameState.timerMs);
-    setConfigPriority(gameState.movePrioritySeat);
+    setConfigHostColor(gameState.hostColor);
   }, [gameState]);
 
   useEffect(() => {
@@ -407,7 +455,16 @@ export default function App() {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ gameKey: selectedGame }),
+        body: JSON.stringify({
+          gameKey: selectedGame,
+          config:
+            selectedGame === "chess"
+              ? {
+                  timerMs: createTimer,
+                  hostColor: createHostColor,
+                }
+              : undefined,
+        }),
       });
 
       const payload = (await response.json()) as CreateRoomResponse & { error?: string };
@@ -489,7 +546,7 @@ export default function App() {
         },
         body: JSON.stringify({
           timerMs: configTimer,
-          movePrioritySeat: configPriority,
+          hostColor: configHostColor,
         }),
       });
 
@@ -583,7 +640,11 @@ export default function App() {
         gameKey={selectedGame}
         joinCode={joinCode}
         message={message}
+        createHostColor={createHostColor}
+        createTimer={createTimer}
         onCreateRoom={createRoom}
+        onCreateHostColorChange={setCreateHostColor}
+        onCreateTimerChange={setCreateTimer}
         onGameSelect={setSelectedGame}
         onJoinCodeChange={setJoinCode}
         onJoinRoom={joinRoom}
@@ -594,7 +655,7 @@ export default function App() {
 
   return (
     <RoomPage
-      configPriority={configPriority}
+      configHostColor={configHostColor}
       configTimer={configTimer}
       error={error}
       gameState={gameState}
@@ -603,7 +664,7 @@ export default function App() {
       onClaimSeat={claimSeat}
       onCopyInvite={copyInvite}
       onMove={(from, to) => sendAction({ type: "move", payload: { from, to } })}
-      onPriorityChange={setConfigPriority}
+      onHostColorChange={setConfigHostColor}
       onSaveConfiguration={saveConfiguration}
       onStartGame={startGame}
       onTimerChange={setConfigTimer}

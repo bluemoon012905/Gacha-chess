@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { getLegalMovesForSquare } from "../../../shared/chess";
-import type { BoardState, ChessState, PieceCode } from "../../../shared/chess";
+import type { BoardState, ChessState, PieceCode, PieceColor } from "../../../shared/chess";
 import type { SeatRole } from "../../../shared/types";
 
 type Props = {
@@ -11,19 +11,19 @@ type Props = {
   onAction: (from: string, to: string) => Promise<void>;
 };
 
-const PIECE_GLYPHS: Record<PieceCode, string> = {
-  wk: "♔",
-  wq: "♕",
-  wr: "♖",
-  wb: "♗",
-  wn: "♘",
-  wp: "♙",
-  bk: "♚",
-  bq: "♛",
-  br: "♜",
-  bb: "♝",
-  bn: "♞",
-  bp: "♟",
+const PIECE_ASSET_PATHS: Record<PieceCode, string> = {
+  wk: "/assets/chess/chessnut/wK.svg",
+  wq: "/assets/chess/chessnut/wQ.svg",
+  wr: "/assets/chess/chessnut/wR.svg",
+  wb: "/assets/chess/chessnut/wB.svg",
+  wn: "/assets/chess/chessnut/wN.svg",
+  wp: "/assets/chess/chessnut/wP.svg",
+  bk: "/assets/chess/chessnut/bK.svg",
+  bq: "/assets/chess/chessnut/bQ.svg",
+  br: "/assets/chess/chessnut/bR.svg",
+  bb: "/assets/chess/chessnut/bB.svg",
+  bn: "/assets/chess/chessnut/bN.svg",
+  bp: "/assets/chess/chessnut/bP.svg",
 };
 
 function squareLabel(row: number, col: number): string {
@@ -41,6 +41,14 @@ function getPlayerColor(game: ChessState, role: SeatRole): "white" | "black" | n
   if (role === "host") return game.hostColor;
   if (role === "guest") return game.guestColor;
   return null;
+}
+
+function getDisplayRows(playerColor: PieceColor | null): number[] {
+  return playerColor === "black" ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+}
+
+function getDisplayCols(playerColor: PieceColor | null): number[] {
+  return playerColor === "black" ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
 }
 
 function formatClock(ms: number): string {
@@ -108,6 +116,8 @@ export function ChessRoomView({ game, joinRole, pending, onAction }: Props) {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const playerColor = getPlayerColor(game, joinRole);
   const clocks = useDerivedClock(game);
+  const displayRows = useMemo(() => getDisplayRows(playerColor), [playerColor]);
+  const displayCols = useMemo(() => getDisplayCols(playerColor), [playerColor]);
   const legalTargets = useMemo(() => {
     if (!selectedSquare) return [];
     return getLegalMovesForSquare(game.board, selectedSquare, game.activeColor, {
@@ -159,8 +169,9 @@ export function ChessRoomView({ game, joinRole, pending, onAction }: Props) {
 
       <div className="board-panel">
         <div className="board-grid" aria-label="Chess board">
-          {game.board.map((row, rowIndex) =>
-            row.map((piece, colIndex) => {
+          {displayRows.map((rowIndex) =>
+            displayCols.map((colIndex) => {
+              const piece = game.board[rowIndex]?.[colIndex] ?? null;
               const square = squareLabel(rowIndex, colIndex);
               const isLight = (rowIndex + colIndex) % 2 === 0;
               const isSelected = selectedSquare === square;
@@ -182,7 +193,14 @@ export function ChessRoomView({ game, joinRole, pending, onAction }: Props) {
                   type="button"
                 >
                   <span className="square-label">{square}</span>
-                  <span className="piece-glyph">{piece ? PIECE_GLYPHS[piece] : ""}</span>
+                  {piece ? (
+                    <img
+                      alt={piece}
+                      className="piece-asset"
+                      draggable={false}
+                      src={PIECE_ASSET_PATHS[piece]}
+                    />
+                  ) : null}
                 </button>
               );
             }),

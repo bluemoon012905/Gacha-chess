@@ -1,17 +1,17 @@
 import { applyMoveToGame, applyTimeoutIfNeeded, createFreshChessGame, createInitialCastlingRights, createInitialChessState } from "./behaviors/engine";
-import type { ChessState, MovePrioritySeat, TimerPreset } from "./logic/types";
+import type { ChessState, HostColorChoice, TimerPreset } from "./logic/types";
 import type { GameCatalogEntry, GameAction, PlayerIdentity, RoomState, SeatRole } from "../../types";
 
 export const CHESS_GAME_META: GameCatalogEntry = {
   key: "chess",
   name: "Standard Chess",
-  summary: "Classic real-time room play with clocks, legal move enforcement, and seat-based turns.",
+  summary: "Classic real-time room play with clocks, legal move enforcement, and explicit side selection.",
   accent: "Match Room",
 };
 
 export type ChessConfigInput = {
   timerMs?: number;
-  movePrioritySeat?: string;
+  hostColor?: string;
 };
 
 const TIMER_PRESETS: TimerPreset[] = [60_000, 180_000, 300_000, 600_000];
@@ -20,31 +20,31 @@ export function isTimerPreset(value: number): value is TimerPreset {
   return TIMER_PRESETS.includes(value as TimerPreset);
 }
 
-export function isMovePrioritySeat(value: string): value is MovePrioritySeat {
-  return value === "host" || value === "guest";
+export function isHostColorChoice(value: string): value is HostColorChoice {
+  return value === "white" || value === "black";
 }
 
 export function createChessGameState(): ChessState {
-  return createInitialChessState("host", 300_000);
+  return createInitialChessState("white", 300_000);
 }
 
 export function configureChessGame(state: ChessState, body: ChessConfigInput): ChessState {
   const timerMs = body.timerMs;
-  const movePrioritySeat = body.movePrioritySeat;
+  const hostColor = body.hostColor;
 
   if (typeof timerMs !== "number" || !isTimerPreset(timerMs)) {
     throw new Error("Choose a supported timer preset.");
   }
 
-  if (typeof movePrioritySeat !== "string" || !isMovePrioritySeat(movePrioritySeat)) {
-    throw new Error("Choose which seat moves first.");
+  if (typeof hostColor !== "string" || !isHostColorChoice(hostColor)) {
+    throw new Error("Choose whether the host plays white or black.");
   }
 
-  return createInitialChessState(movePrioritySeat, timerMs);
+  return createInitialChessState(hostColor, timerMs);
 }
 
 export function startChessGame(state: ChessState, startedAt: string): ChessState {
-  return createFreshChessGame(state.movePrioritySeat, state.timerMs, startedAt);
+  return createFreshChessGame(state.hostColor, state.timerMs, startedAt);
 }
 
 export function applyChessAction(

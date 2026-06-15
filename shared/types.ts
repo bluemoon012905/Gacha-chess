@@ -57,6 +57,7 @@ export type GameCatalogEntry = {
 
 export type CreateRoomRequest = {
   gameKey: GameKey;
+  config?: Record<string, unknown>;
 };
 
 export type CreateRoomResponse = {

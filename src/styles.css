@@ -306,6 +306,15 @@ h1 {
   z-index: 1;
 }
 
+.piece-asset {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
 .move-list ol {
   margin: 0;
   padding-left: 1.1rem;

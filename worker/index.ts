@@ -97,13 +97,17 @@ export class GameRoom extends DurableObject<Env> {
     const url = new URL(request.url);
 
     if (url.pathname === "/init" && request.method === "POST") {
-      const payload = (await request.json()) as { roomId?: string; gameKey?: string };
+      const payload = (await request.json()) as {
+        roomId?: string;
+        gameKey?: string;
+        config?: Record<string, unknown>;
+      };
       const roomId = payload.roomId;
       const gameKey = payload.gameKey;
       if (!roomId || !gameKey || !isGameKey(gameKey)) {
         return json({ error: "Invalid room initialization request." }, { status: 400 });
       }
-      return json(await this.initializeRoom(roomId, gameKey));
+      return json(await this.initializeRoom(roomId, gameKey, payload.config));
     }
 
     if (url.pathname === "/state" && request.method === "GET") {
@@ -187,7 +191,11 @@ export class GameRoom extends DurableObject<Env> {
     ws.close(code, reason);
   }
 
-  private async initializeRoom(roomId: string, gameKey: GameKey): Promise<RoomPayload> {
+  private async initializeRoom(
+    roomId: string,
+    gameKey: GameKey,
+    config?: Record<string, unknown>,
+  ): Promise<RoomPayload> {
     const existing = await this.ctx.storage.get<StoredRoom>("state");
     if (existing) {
       const normalized = this.normalizeStoredRoom(existing);
@@ -205,7 +213,7 @@ export class GameRoom extends DurableObject<Env> {
 
     const stored: StoredRoom = {
       room,
-      game: createGameState(gameKey),
+      game: config ? configureGameState(gameKey, createGameState(gameKey), config) : createGameState(gameKey),
     };
 
     await this.ctx.storage.put("state", stored);
@@ -415,6 +423,7 @@ export default {
         body: JSON.stringify({
           roomId,
           gameKey: body.gameKey,
+          config: body.config,
         }),
       });
 

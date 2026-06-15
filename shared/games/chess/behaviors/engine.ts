@@ -3,7 +3,7 @@ import type {
   BoardState,
   CastlingRights,
   ChessState,
-  MovePrioritySeat,
+  HostColorChoice,
   MoveRecord,
   PieceCode,
   PieceColor,
@@ -39,7 +39,7 @@ type ExecutedMove = {
 const FILES = "abcdefgh";
 
 export { createFreshChessGame, createInitialCastlingRights, createInitialChessState };
-export type { MovePrioritySeat, TimerPreset };
+export type { HostColorChoice, TimerPreset };
 
 export function cloneBoard(board: BoardState): BoardState {
   return board.map((row) => [...row]);

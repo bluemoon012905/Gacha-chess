@@ -1,4 +1,4 @@
-import type { BoardState, CastlingRights, ChessState, MovePrioritySeat, PieceCode, TimerPreset } from "./types";
+import type { BoardState, CastlingRights, ChessState, HostColorChoice, PieceCode, TimerPreset } from "./types";
 
 const BLACK_BACK_RANK: PieceCode[] = ["br", "bn", "bb", "bq", "bk", "bb", "bn", "br"];
 const WHITE_BACK_RANK: PieceCode[] = ["wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"];
@@ -24,17 +24,19 @@ export function createInitialCastlingRights(): CastlingRights {
 }
 
 export function createInitialChessState(
-  movePrioritySeat: MovePrioritySeat,
+  hostColorChoice: HostColorChoice,
   timerMs: TimerPreset,
 ): ChessState {
+  const hostColor = hostColorChoice;
+  const guestColor = hostColor === "white" ? "black" : "white";
+
   return {
     key: "chess",
     status: "waiting",
     board: createInitialBoard(),
-    hostColor: "white",
-    guestColor: "black",
-    activeColor: movePrioritySeat === "host" ? "white" : "black",
-    movePrioritySeat,
+    hostColor,
+    guestColor,
+    activeColor: "white",
     timerMs,
     whiteRemainingMs: timerMs,
     blackRemainingMs: timerMs,
@@ -49,11 +51,11 @@ export function createInitialChessState(
 }
 
 export function createFreshChessGame(
-  movePrioritySeat: MovePrioritySeat,
+  hostColorChoice: HostColorChoice,
   timerMs: TimerPreset,
   startedAt: string,
 ): ChessState {
-  const state = createInitialChessState(movePrioritySeat, timerMs);
+  const state = createInitialChessState(hostColorChoice, timerMs);
   return {
     ...state,
     status: "active",
