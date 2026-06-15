@@ -90,16 +90,25 @@ function HomePage({
 }) {
   return (
     <main className="app-shell">
-      <section className="hero-panel">
+      <section className="hero-panel lobby-page">
+        <div className="page-marker">
+          <span className="eyebrow">Front Desk</span>
+          <span className="page-count">Page 1</span>
+        </div>
+
         <div className="hero-copy">
-          <span className="eyebrow">Arcade Lobby</span>
-          <h1>Choose a game, then open or find a room.</h1>
+          <p className="kicker">Gacha Chess Club</p>
+          <h1>Pick a table and start playing.</h1>
           <p className="lede">
-            Room creation, seat claims, realtime updates, and player identity are now shared
-            infrastructure. Each game plugs into that layer through its own logic and behavior
-            module.
+            Clean tables, sharp cards, and room codes that are easy to pass around.
           </p>
         </div>
+
+        <section className="panel-card page-note">
+          <p>
+            Choose a game first. Then either open a fresh room or step into one with a code.
+          </p>
+        </section>
 
         <div className="game-grid">
           {GAME_CATALOG.map((game) => (
@@ -118,8 +127,13 @@ function HomePage({
 
         <div className="lobby-grid">
           <section className="panel-card">
-            <h2>Start a room</h2>
-            <p>Launch a new room for {getGameCatalogEntry(gameKey).name}.</p>
+            <div className="section-heading">
+              <span className="panel-index">01</span>
+              <div>
+                <h2>Start a room</h2>
+                <p>{getGameCatalogEntry(gameKey).name} will open with your current settings.</p>
+              </div>
+            </div>
             {gameKey === "chess" ? (
               <div className="join-form">
                 <label>
@@ -160,7 +174,13 @@ function HomePage({
           </section>
 
           <section className="panel-card">
-            <h2>Find a room</h2>
+            <div className="section-heading">
+              <span className="panel-index">02</span>
+              <div>
+                <h2>Find a room</h2>
+                <p>Drop in with a room code.</p>
+              </div>
+            </div>
             <form className="join-form" onSubmit={onJoinRoom}>
               <label htmlFor="join-code">Room code</label>
               <div className="join-input-row">
@@ -240,14 +260,25 @@ function RoomPage({
   return (
     <main className="app-shell room-shell">
       <section className="hero-panel room-layout">
-        <div className="room-copy">
-          <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
+        <div className="room-copy room-sidebar">
+          <div className="page-marker">
+            <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
+            <a className="text-link" href="/">
+              Back to lobby
+            </a>
+          </div>
           <h1>{roomId}</h1>
-          <p className="lede">{gameMeta?.summary ?? "Loading room metadata."}</p>
+          <p className="lede">{gameMeta?.summary ?? "Loading room details."}</p>
+
+          <section className="panel-card page-note">
+            <p>
+              Share this code, seat two players, then start when the table is ready.
+            </p>
+          </section>
 
           <div className="stats-grid">
             <article className="stat-card">
-              <span>Room</span>
+              <span>Room state</span>
               <strong>{roomState?.status ?? "loading"}</strong>
             </article>
             <article className="stat-card">
@@ -259,7 +290,7 @@ function RoomPage({
               <strong>{playerName}</strong>
             </article>
             <article className="stat-card">
-              <span>Room Host</span>
+              <span>Desk host</span>
               <strong>{getRoomHostName(roomState)}</strong>
             </article>
           </div>
@@ -270,11 +301,11 @@ function RoomPage({
               <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
             </article>
             <article className="seat-card">
-              <span>Your status</span>
+              <span>Your seat</span>
               <strong>{isRoomHost ? `${joinRole} · room host` : joinRole}</strong>
             </article>
             <article className="seat-card">
-              <span>Players Needed</span>
+              <span>Seats filled</span>
               <strong>
                 {roomState ? `${roomState.seatedPlayerCount}/2 seated` : "..."}
               </strong>
@@ -283,14 +314,14 @@ function RoomPage({
 
           <div className="seat-grid">
             <article className="seat-card">
-              <span>Player A</span>
+              <span>Seat A</span>
               <strong>
                 {roomState?.host.displayName ?? "Open seat"}
                 {chessState ? ` · ${chessState.hostColor}` : ""}
               </strong>
             </article>
             <article className="seat-card">
-              <span>Player B</span>
+              <span>Seat B</span>
               <strong>
                 {roomState?.guest.displayName ?? "Open seat"}
                 {chessState ? ` · ${chessState.guestColor}` : ""}
@@ -299,7 +330,13 @@ function RoomPage({
           </div>
 
           <div className="panel-card">
-            <h2>Room Members</h2>
+            <div className="section-heading">
+              <span className="panel-index">Roster</span>
+              <div>
+                <h2>Room Members</h2>
+                <p>Assign seats and keep the table organized.</p>
+              </div>
+            </div>
             {roomState?.members.length ? (
               <div className="member-list">
                 {roomState.members.map((member) => (
@@ -309,9 +346,9 @@ function RoomPage({
                       {member.playerId === roomState.roomHostPlayerId
                         ? "Room host"
                         : member.playerId === roomState.host.playerId
-                          ? "Player A"
+                          ? "Seat A"
                           : member.playerId === roomState.guest.playerId
-                            ? "Player B"
+                            ? "Seat B"
                             : "Watcher"}
                     </span>
                     {isRoomHost ? (
@@ -327,7 +364,7 @@ function RoomPage({
                           }
                           type="button"
                         >
-                          Make Player A
+                          Make Seat A
                         </button>
                         <button
                           className="secondary"
@@ -340,7 +377,7 @@ function RoomPage({
                           }
                           type="button"
                         >
-                          Make Player B
+                          Make Seat B
                         </button>
                         <button
                           className="secondary"
@@ -371,7 +408,7 @@ function RoomPage({
                   onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "host" } })}
                   type="button"
                 >
-                  Clear Player A
+                  Clear Seat A
                 </button>
                 <button
                   className="secondary"
@@ -379,7 +416,7 @@ function RoomPage({
                   onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "guest" } })}
                   type="button"
                 >
-                  Clear Player B
+                  Clear Seat B
                 </button>
               </div>
             ) : null}
@@ -387,7 +424,7 @@ function RoomPage({
 
           <div className="room-actions">
             <button disabled={pending} onClick={() => void onClaimSeat()} type="button">
-              {pending ? "Working..." : isMember ? "Refresh room membership" : "Join this room"}
+              {pending ? "Working..." : isMember ? "Refresh membership" : "Join this room"}
             </button>
             <button className="secondary" onClick={() => void onCopyInvite()} type="button">
               Copy invite link
@@ -396,6 +433,13 @@ function RoomPage({
 
           {chessState ? (
             <div className="setup-panel">
+              <div className="section-heading">
+                <span className="panel-index">Setup</span>
+                <div>
+                  <h2>Match settings</h2>
+                  <p>Only the room host can edit these before the game starts.</p>
+                </div>
+              </div>
               <div className="setup-row">
                 <label>
                   Timer
@@ -454,7 +498,7 @@ function RoomPage({
           ) : (
             <div className="setup-panel">
               <p className="status-line">
-                The room can hold more spectators, but two seated players are required to start.
+                Spectators can watch, but two seated players are required to begin.
               </p>
               <div className="setup-actions">
                 <button
