@@ -342,6 +342,10 @@ h1 {
   align-items: start;
 }
 
+.room-layout.play-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .room-sidebar {
   position: sticky;
   top: 2rem;
@@ -349,12 +353,26 @@ h1 {
 
 .room-stage {
   align-content: start;
+  min-width: 0;
+}
+
+.play-header {
+  display: grid;
+  gap: 1rem;
+}
+
+.play-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .board-shell,
 .card-room-shell {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .board-meta {
@@ -371,11 +389,14 @@ h1 {
 .board-panel {
   align-items: start;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  min-width: 0;
 }
 
 .board-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
   border-radius: 0;
   overflow: hidden;
   border: 2px solid rgba(34, 27, 20, 0.85);
@@ -445,6 +466,7 @@ h1 {
 
 .card-table {
   grid-template-columns: 1fr;
+  min-width: 0;
 }
 
 .card-row {
@@ -549,5 +571,9 @@ h1 {
   .page-marker,
   .section-heading {
     flex-direction: column;
+  }
+
+  .play-header-actions {
+    width: 100%;
   }
 }

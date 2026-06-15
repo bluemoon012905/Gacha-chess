@@ -256,267 +256,292 @@ function RoomPage({
   const chessState = gameState?.key === "chess" ? (gameState as ChessState) : null;
   const fourteenPointsState =
     gameState?.key === "fourteen-points" ? (gameState as FourteenPointsState) : null;
+  const hasGameStarted = chessState
+    ? chessState.status !== "waiting"
+    : fourteenPointsState
+      ? fourteenPointsState.status !== "waiting"
+      : false;
 
   return (
     <main className="app-shell room-shell">
-      <section className="hero-panel room-layout">
-        <div className="room-copy room-sidebar">
-          <div className="page-marker">
-            <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
-            <a className="text-link" href="/">
-              Back to lobby
-            </a>
-          </div>
-          <h1>{roomId}</h1>
-          <p className="lede">{gameMeta?.summary ?? "Loading room details."}</p>
-
-          <section className="panel-card page-note">
-            <p>
-              Share this code, seat two players, then start when the table is ready.
-            </p>
-          </section>
-
-          <div className="stats-grid">
-            <article className="stat-card">
-              <span>Room state</span>
-              <strong>{roomState?.status ?? "loading"}</strong>
-            </article>
-            <article className="stat-card">
-              <span>Members</span>
-              <strong>{roomState?.playerCount ?? 0}</strong>
-            </article>
-            <article className="stat-card">
-              <span>You</span>
-              <strong>{playerName}</strong>
-            </article>
-            <article className="stat-card">
-              <span>Desk host</span>
-              <strong>{getRoomHostName(roomState)}</strong>
-            </article>
-          </div>
-
-          <div className="seat-grid">
-            <article className="seat-card">
-              <span>Created</span>
-              <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
-            </article>
-            <article className="seat-card">
-              <span>Your seat</span>
-              <strong>{isRoomHost ? `${joinRole} · room host` : joinRole}</strong>
-            </article>
-            <article className="seat-card">
-              <span>Seats filled</span>
-              <strong>
-                {roomState ? `${roomState.seatedPlayerCount}/2 seated` : "..."}
-              </strong>
-            </article>
-          </div>
-
-          <div className="seat-grid">
-            <article className="seat-card">
-              <span>Seat A</span>
-              <strong>
-                {roomState?.host.displayName ?? "Open seat"}
-                {chessState ? ` · ${chessState.hostColor}` : ""}
-              </strong>
-            </article>
-            <article className="seat-card">
-              <span>Seat B</span>
-              <strong>
-                {roomState?.guest.displayName ?? "Open seat"}
-                {chessState ? ` · ${chessState.guestColor}` : ""}
-              </strong>
-            </article>
-          </div>
-
-          <div className="panel-card">
-            <div className="section-heading">
-              <span className="panel-index">Roster</span>
-              <div>
-                <h2>Room Members</h2>
-                <p>Assign seats and keep the table organized.</p>
-              </div>
+      <section className={`hero-panel room-layout ${hasGameStarted ? "play-layout" : ""}`}>
+        {!hasGameStarted ? (
+          <div className="room-copy room-sidebar">
+            <div className="page-marker">
+              <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
+              <a className="text-link" href="/">
+                Back to lobby
+              </a>
             </div>
-            {roomState?.members.length ? (
-              <div className="member-list">
-                {roomState.members.map((member) => (
-                  <div className="member-card" key={member.playerId}>
-                    <strong>{member.displayName}</strong>
-                    <span>
-                      {member.playerId === roomState.roomHostPlayerId
-                        ? "Room host"
-                        : member.playerId === roomState.host.playerId
-                          ? "Seat A"
-                          : member.playerId === roomState.guest.playerId
-                            ? "Seat B"
-                            : "Watcher"}
-                    </span>
-                    {isRoomHost ? (
-                      <div className="member-actions">
-                        <button
-                          className="secondary"
-                          disabled={pending}
-                          onClick={() =>
-                            void onLobbyAction({
-                              type: "assign_seat",
-                              payload: { memberId: member.playerId, seat: "host" },
-                            })
-                          }
-                          type="button"
-                        >
-                          Make Seat A
-                        </button>
-                        <button
-                          className="secondary"
-                          disabled={pending}
-                          onClick={() =>
-                            void onLobbyAction({
-                              type: "assign_seat",
-                              payload: { memberId: member.playerId, seat: "guest" },
-                            })
-                          }
-                          type="button"
-                        >
-                          Make Seat B
-                        </button>
-                        <button
-                          className="secondary"
-                          disabled={pending || member.playerId === roomState.roomHostPlayerId}
-                          onClick={() =>
-                            void onLobbyAction({
-                              type: "transfer_room_host",
-                              payload: { memberId: member.playerId },
-                            })
-                          }
-                          type="button"
-                        >
-                          Transfer Host
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p>No one has joined yet.</p>
-            )}
-            {isRoomHost ? (
-              <div className="setup-actions">
-                <button
-                  className="secondary"
-                  disabled={pending || !roomState?.host.playerId}
-                  onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "host" } })}
-                  type="button"
-                >
-                  Clear Seat A
-                </button>
-                <button
-                  className="secondary"
-                  disabled={pending || !roomState?.guest.playerId}
-                  onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "guest" } })}
-                  type="button"
-                >
-                  Clear Seat B
-                </button>
-              </div>
-            ) : null}
-          </div>
+            <h1>{roomId}</h1>
+            <p className="lede">{gameMeta?.summary ?? "Loading room details."}</p>
 
-          <div className="room-actions">
-            <button disabled={pending} onClick={() => void onClaimSeat()} type="button">
-              {pending ? "Working..." : isMember ? "Refresh membership" : "Join this room"}
-            </button>
-            <button className="secondary" onClick={() => void onCopyInvite()} type="button">
-              Copy invite link
-            </button>
-          </div>
+            <section className="panel-card page-note">
+              <p>
+                Share this code, seat two players, then start when the table is ready.
+              </p>
+            </section>
 
-          {chessState ? (
-            <div className="setup-panel">
+            <div className="stats-grid">
+              <article className="stat-card">
+                <span>Room state</span>
+                <strong>{roomState?.status ?? "loading"}</strong>
+              </article>
+              <article className="stat-card">
+                <span>Members</span>
+                <strong>{roomState?.playerCount ?? 0}</strong>
+              </article>
+              <article className="stat-card">
+                <span>You</span>
+                <strong>{playerName}</strong>
+              </article>
+              <article className="stat-card">
+                <span>Desk host</span>
+                <strong>{getRoomHostName(roomState)}</strong>
+              </article>
+            </div>
+
+            <div className="seat-grid">
+              <article className="seat-card">
+                <span>Created</span>
+                <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
+              </article>
+              <article className="seat-card">
+                <span>Your seat</span>
+                <strong>{isRoomHost ? `${joinRole} · room host` : joinRole}</strong>
+              </article>
+              <article className="seat-card">
+                <span>Seats filled</span>
+                <strong>
+                  {roomState ? `${roomState.seatedPlayerCount}/2 seated` : "..."}
+                </strong>
+              </article>
+            </div>
+
+            <div className="seat-grid">
+              <article className="seat-card">
+                <span>Seat A</span>
+                <strong>
+                  {roomState?.host.displayName ?? "Open seat"}
+                  {chessState ? ` · ${chessState.hostColor}` : ""}
+                </strong>
+              </article>
+              <article className="seat-card">
+                <span>Seat B</span>
+                <strong>
+                  {roomState?.guest.displayName ?? "Open seat"}
+                  {chessState ? ` · ${chessState.guestColor}` : ""}
+                </strong>
+              </article>
+            </div>
+
+            <div className="panel-card">
               <div className="section-heading">
-                <span className="panel-index">Setup</span>
+                <span className="panel-index">Roster</span>
                 <div>
-                  <h2>Match settings</h2>
-                  <p>Only the room host can edit these before the game starts.</p>
+                  <h2>Room Members</h2>
+                  <p>Assign seats and keep the table organized.</p>
                 </div>
               </div>
-              <div className="setup-row">
-                <label>
-                  Timer
-                  <select
-                    disabled={!isRoomHost || chessState.status !== "waiting" || pending}
-                    onChange={(event) => onTimerChange(Number(event.target.value) as TimerPreset)}
-                    value={configTimer}
+              {roomState?.members.length ? (
+                <div className="member-list">
+                  {roomState.members.map((member) => (
+                    <div className="member-card" key={member.playerId}>
+                      <strong>{member.displayName}</strong>
+                      <span>
+                        {member.playerId === roomState.roomHostPlayerId
+                          ? "Room host"
+                          : member.playerId === roomState.host.playerId
+                            ? "Seat A"
+                            : member.playerId === roomState.guest.playerId
+                              ? "Seat B"
+                              : "Watcher"}
+                      </span>
+                      {isRoomHost ? (
+                        <div className="member-actions">
+                          <button
+                            className="secondary"
+                            disabled={pending}
+                            onClick={() =>
+                              void onLobbyAction({
+                                type: "assign_seat",
+                                payload: { memberId: member.playerId, seat: "host" },
+                              })
+                            }
+                            type="button"
+                          >
+                            Make Seat A
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={pending}
+                            onClick={() =>
+                              void onLobbyAction({
+                                type: "assign_seat",
+                                payload: { memberId: member.playerId, seat: "guest" },
+                              })
+                            }
+                            type="button"
+                          >
+                            Make Seat B
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={pending || member.playerId === roomState.roomHostPlayerId}
+                            onClick={() =>
+                              void onLobbyAction({
+                                type: "transfer_room_host",
+                                payload: { memberId: member.playerId },
+                              })
+                            }
+                            type="button"
+                          >
+                            Transfer Host
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No one has joined yet.</p>
+              )}
+              {isRoomHost ? (
+                <div className="setup-actions">
+                  <button
+                    className="secondary"
+                    disabled={pending || !roomState?.host.playerId}
+                    onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "host" } })}
+                    type="button"
                   >
-                    {TIMER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Host color
-                  <select
-                    disabled={!isRoomHost || chessState.status !== "waiting" || pending}
-                    onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
-                    value={configHostColor}
+                    Clear Seat A
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={pending || !roomState?.guest.playerId}
+                    onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "guest" } })}
+                    type="button"
                   >
-                    {COLOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="setup-actions">
-                <button
-                  className="secondary"
-                  disabled={!isRoomHost || pending || chessState.status !== "waiting"}
-                  onClick={() => void onSaveConfiguration()}
-                  type="button"
-                >
-                  Save settings
-                </button>
-                <button
-                  disabled={
-                    !isRoomHost ||
-                    pending ||
-                    roomState?.status !== "ready" ||
-                    chessState.status !== "waiting"
-                  }
-                  onClick={() => void onStartGame()}
-                  type="button"
-                >
-                  Start match
-                </button>
-              </div>
+                    Clear Seat B
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <div className="setup-panel">
-              <p className="status-line">
-                Spectators can watch, but two seated players are required to begin.
-              </p>
-              <div className="setup-actions">
-                <button
-                  disabled={!isRoomHost || pending || roomState?.status !== "ready"}
-                  onClick={() => void onStartGame()}
-                  type="button"
-                >
-                  Start match
-                </button>
-              </div>
-            </div>
-          )}
 
-          {message ? <p className="status-line">{message}</p> : null}
-          {error ? <p className="error-line">{error}</p> : null}
-        </div>
+            <div className="room-actions">
+              <button disabled={pending} onClick={() => void onClaimSeat()} type="button">
+                {pending ? "Working..." : isMember ? "Refresh membership" : "Join this room"}
+              </button>
+              <button className="secondary" onClick={() => void onCopyInvite()} type="button">
+                Copy invite link
+              </button>
+            </div>
+
+            {chessState ? (
+              <div className="setup-panel">
+                <div className="section-heading">
+                  <span className="panel-index">Setup</span>
+                  <div>
+                    <h2>Match settings</h2>
+                    <p>Only the room host can edit these before the game starts.</p>
+                  </div>
+                </div>
+                <div className="setup-row">
+                  <label>
+                    Timer
+                    <select
+                      disabled={!isRoomHost || chessState.status !== "waiting" || pending}
+                      onChange={(event) => onTimerChange(Number(event.target.value) as TimerPreset)}
+                      value={configTimer}
+                    >
+                      {TIMER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Host color
+                    <select
+                      disabled={!isRoomHost || chessState.status !== "waiting" || pending}
+                      onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
+                      value={configHostColor}
+                    >
+                      {COLOR_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="setup-actions">
+                  <button
+                    className="secondary"
+                    disabled={!isRoomHost || pending || chessState.status !== "waiting"}
+                    onClick={() => void onSaveConfiguration()}
+                    type="button"
+                  >
+                    Save settings
+                  </button>
+                  <button
+                    disabled={
+                      !isRoomHost ||
+                      pending ||
+                      roomState?.status !== "ready" ||
+                      chessState.status !== "waiting"
+                    }
+                    onClick={() => void onStartGame()}
+                    type="button"
+                  >
+                    Start match
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="setup-panel">
+                <p className="status-line">
+                  Spectators can watch, but two seated players are required to begin.
+                </p>
+                <div className="setup-actions">
+                  <button
+                    disabled={!isRoomHost || pending || roomState?.status !== "ready"}
+                    onClick={() => void onStartGame()}
+                    type="button"
+                  >
+                    Start match
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {message ? <p className="status-line">{message}</p> : null}
+            {error ? <p className="error-line">{error}</p> : null}
+          </div>
+        ) : null}
 
         <div className="room-stage">
+          {hasGameStarted ? (
+            <div className="play-header">
+              <div className="page-marker">
+                <span className="eyebrow">{gameMeta?.accent ?? "Game"}</span>
+                <div className="play-header-actions">
+                  <button className="secondary" onClick={() => void onCopyInvite()} type="button">
+                    Copy invite link
+                  </button>
+                  <a className="text-link" href="/">
+                    Back to lobby
+                  </a>
+                </div>
+              </div>
+              {message ? <p className="status-line">{message}</p> : null}
+              {error ? <p className="error-line">{error}</p> : null}
+            </div>
+          ) : null}
+
           {chessState ? (
             <ChessRoomView
               game={chessState}
