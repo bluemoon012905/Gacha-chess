@@ -59,8 +59,15 @@ On a turn, a player may do either of the following:
 
 1. Capture:
    Use 1 hand card with 1 or more open cards to total `14`.
-2. Draw and discard:
-   Draw 1 card from the deck if any remain, then place 1 card from hand into the open area.
+2. Draw, then discard:
+   Draw 1 card from the deck if any remain so the hand briefly reaches 5 cards, then place 1 card from hand into the open area.
+
+Special capture flow:
+
+- if the open area had exactly 4 cards when a player makes a `14` capture
+- the acting player then draws 2 cards from the deck if available
+- the acting player must choose 1 card from hand to place back into the open area
+- this replaces the normal automatic refill behavior for that capture
 
 The player is allowed to draw and discard even if a legal `14` capture is available.
 
@@ -81,7 +88,8 @@ Implementation refill rules:
 
 - after a successful capture, the acting player's hand refills up to 4 from the deck if possible
 - after a successful capture, the open area refills up to 4 from the deck if possible
-- after draw-and-discard, the acting player's hand ends the turn after discarding; no extra refill happens
+- after drawing, the acting player must discard 1 card into the open area to end the turn; no extra refill happens
+- after a capture from a 4-card open area, the acting player draws 2 cards and discards 1 by choice instead of using the automatic refill
 
 This matches the requested behavior where:
 

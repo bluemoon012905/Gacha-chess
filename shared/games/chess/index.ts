@@ -7,6 +7,7 @@ export const CHESS_GAME_META: GameCatalogEntry = {
   name: "Standard Chess",
   summary: "Classic real-time room play with clocks, legal move enforcement, and explicit side selection.",
   accent: "Match Room",
+  seatOrder: ["host", "guest"],
 };
 
 export type ChessConfigInput = {
@@ -106,7 +107,7 @@ export function normalizeChessState(state: ChessState): ChessState {
 }
 
 function resolveSeatRole(room: RoomState, playerId: string): SeatRole {
-  if (room.host.playerId === playerId) return "host";
-  if (room.guest.playerId === playerId) return "guest";
+  if (room.seats.host?.playerId === playerId) return "host";
+  if (room.seats.guest?.playerId === playerId) return "guest";
   return "spectator";
 }

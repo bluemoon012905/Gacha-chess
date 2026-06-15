@@ -1,8 +1,10 @@
 import type { ChessState } from "./games/chess/logic/types";
+import type { FiveTenKingState } from "./games/five-ten-king/logic/types";
 import type { FourteenPointsState } from "./games/fourteen-points/logic/types";
 
-export type SeatRole = "host" | "guest" | "spectator";
-export type GameKey = "chess" | "fourteen-points";
+export type PlayableSeatRole = "host" | "guest" | "north" | "east" | "south" | "west";
+export type SeatRole = PlayableSeatRole | "spectator";
+export type GameKey = "chess" | "fourteen-points" | "five-ten-king";
 
 export type PlayerIdentity = {
   playerId: string;
@@ -25,8 +27,8 @@ export type RoomState = {
   gameKey: GameKey;
   createdAt: string;
   roomHostPlayerId: string | null;
-  host: RoomSeat;
-  guest: RoomSeat;
+  seatOrder: PlayableSeatRole[];
+  seats: Partial<Record<PlayableSeatRole, RoomSeat>>;
   members: RoomMember[];
 };
 
@@ -53,9 +55,31 @@ export type FourteenPointsCaptureAction = {
 };
 
 export type FourteenPointsDrawAndDiscardAction = {
-  type: "draw_and_discard";
+  type: "draw_card";
+};
+
+export type FourteenPointsDiscardToOpenAction = {
+  type: "discard_to_open";
   payload: {
     discardCardId: string;
+  };
+};
+
+export type FiveTenKingPlayCardsAction = {
+  type: "play_cards";
+  payload: {
+    cardIds: string[];
+  };
+};
+
+export type FiveTenKingPassAction = {
+  type: "pass_turn";
+};
+
+export type FiveTenKingIntersectAction = {
+  type: "intersect_play";
+  payload: {
+    cardIds: string[];
   };
 };
 
@@ -64,13 +88,13 @@ export type LobbyAction =
       type: "assign_seat";
       payload: {
         memberId: string;
-        seat: "host" | "guest";
+        seat: PlayableSeatRole;
       };
     }
   | {
       type: "clear_seat";
       payload: {
-        seat: "host" | "guest";
+        seat: PlayableSeatRole;
       };
     }
   | {
@@ -83,9 +107,13 @@ export type LobbyAction =
 export type GameAction =
   | ChessMoveAction
   | FourteenPointsCaptureAction
-  | FourteenPointsDrawAndDiscardAction;
+  | FourteenPointsDrawAndDiscardAction
+  | FourteenPointsDiscardToOpenAction
+  | FiveTenKingPlayCardsAction
+  | FiveTenKingPassAction
+  | FiveTenKingIntersectAction;
 
-export type AnyGameState = ChessState | FourteenPointsState;
+export type AnyGameState = ChessState | FourteenPointsState | FiveTenKingState;
 
 export type RoomPayload = {
   room: RoomSnapshot;
@@ -102,6 +130,7 @@ export type GameCatalogEntry = {
   name: string;
   summary: string;
   accent: string;
+  seatOrder: PlayableSeatRole[];
 };
 
 export type CreateRoomRequest = {

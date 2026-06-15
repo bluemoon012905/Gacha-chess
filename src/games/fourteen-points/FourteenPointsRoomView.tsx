@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FourteenPointsState, PlayingCard } from "../../../shared/fourteen-points";
 import type { SeatRole } from "../../../shared/types";
@@ -8,7 +8,8 @@ type Props = {
   joinRole: SeatRole;
   pending: boolean;
   onCapture: (handCardId: string, openCardIds: string[]) => Promise<void>;
-  onDrawAndDiscard: (discardCardId: string) => Promise<void>;
+  onDrawCard: () => Promise<void>;
+  onDiscardToOpen: (discardCardId: string) => Promise<void>;
 };
 
 const CARD_SPRITE_PATH = "/assets/cards/svg-cards/svg-cards.svg";
@@ -45,6 +46,10 @@ function statusLabel(game: FourteenPointsState): string {
   if (game.status === "complete") {
     if (game.winner === "tie") return "game complete, tie";
     return `game complete, ${game.winner} wins`;
+  }
+
+  if (game.turnPhase === "discard") {
+    return game.discardSource === "capture" ? `${game.activeSeat} to discard after capture` : `${game.activeSeat} to discard`;
   }
 
   return `${game.activeSeat} to act`;
@@ -92,13 +97,15 @@ export function FourteenPointsRoomView({
   joinRole,
   pending,
   onCapture,
-  onDrawAndDiscard,
+  onDrawCard,
+  onDiscardToOpen,
 }: Props) {
   const [selectedHandCardId, setSelectedHandCardId] = useState<string | null>(null);
   const [selectedOpenCardIds, setSelectedOpenCardIds] = useState<string[]>([]);
   const visibleHand = useMemo(() => getVisibleHand(game, joinRole), [game, joinRole]);
   const opponentCount = getOpponentCount(game, joinRole);
   const playerCanAct = canAct(game, joinRole);
+  const inDiscardPhase = game.turnPhase === "discard";
   const selectedHandCard = visibleHand.find((card) => card.id === selectedHandCardId) ?? null;
   const captureTotal =
     (selectedHandCard?.value ?? 0) +
@@ -107,7 +114,26 @@ export function FourteenPointsRoomView({
       return sum + (openCard?.value ?? 0);
     }, 0);
 
+  useEffect(() => {
+    setSelectedHandCardId((current) =>
+      current && visibleHand.some((card) => card.id === current) ? current : null,
+    );
+  }, [visibleHand]);
+
+  useEffect(() => {
+    setSelectedOpenCardIds((current) =>
+      current.filter((cardId) => game.openCards.some((card) => card.id === cardId)),
+    );
+  }, [game.openCards]);
+
+  useEffect(() => {
+    if (inDiscardPhase) {
+      setSelectedOpenCardIds([]);
+    }
+  }, [inDiscardPhase]);
+
   function toggleOpenCard(cardId: string) {
+    if (inDiscardPhase) return;
     setSelectedOpenCardIds((current) =>
       current.includes(cardId) ? current.filter((value) => value !== cardId) : [...current, cardId],
     );
@@ -120,9 +146,9 @@ export function FourteenPointsRoomView({
     setSelectedOpenCardIds([]);
   }
 
-  async function submitDrawAndDiscard() {
+  async function submitDiscardToOpen() {
     if (!selectedHandCardId) return;
-    await onDrawAndDiscard(selectedHandCardId);
+    await onDiscardToOpen(selectedHandCardId);
     setSelectedHandCardId(null);
     setSelectedOpenCardIds([]);
   }
@@ -161,12 +187,18 @@ export function FourteenPointsRoomView({
 
         <section className="panel-card">
           <h2>Open Cards</h2>
-          <p>Select open cards to total 14 with one card from your hand.</p>
+          <p>
+            {inDiscardPhase
+              ? game.discardSource === "capture"
+                ? "You captured 14 with a full open row. Two replacement cards were drawn into your hand, and now you must place one card into the open area."
+                : "You drew a card. Now choose one hand card to place into the open area."
+              : "Select open cards to total 14 with one card from your hand."}
+          </p>
           <div className="card-row">
             {game.openCards.map((card) => (
               <PlayingCardFace
                 card={card}
-                disabled={pending || !playerCanAct}
+                disabled={pending || !playerCanAct || inDiscardPhase}
                 key={card.id}
                 onClick={() => toggleOpenCard(card.id)}
                 selected={selectedOpenCardIds.includes(card.id)}
@@ -177,7 +209,13 @@ export function FourteenPointsRoomView({
 
         <section className="panel-card">
           <h2>Your Hand</h2>
-          <p>Choose one card to capture with, or choose one to discard after drawing.</p>
+          <p>
+            {inDiscardPhase
+              ? game.discardSource === "capture"
+                ? "Choose one card from your hand to return to the open area."
+                : "Choose one card to discard into the open area."
+              : "Choose one card to capture with, or draw first and then discard one card."}
+          </p>
           <div className="card-row">
             {visibleHand.map((card) => (
               <PlayingCardFace
@@ -208,20 +246,46 @@ export function FourteenPointsRoomView({
         <p className="status-line">{game.lastAction ?? "Waiting for play."}</p>
         <div className="setup-actions">
           <button
-            disabled={!playerCanAct || pending || !selectedHandCardId || selectedOpenCardIds.length === 0}
+            disabled={
+              !playerCanAct ||
+              pending ||
+              inDiscardPhase ||
+              !selectedHandCardId ||
+              selectedOpenCardIds.length === 0
+            }
             onClick={() => void submitCapture()}
             type="button"
           >
             Capture 14
           </button>
-          <button
-            className="secondary"
-            disabled={!playerCanAct || pending || !selectedHandCardId}
-            onClick={() => void submitDrawAndDiscard()}
-            type="button"
-          >
-            {game.deck.length > 0 ? "Draw and discard" : "Discard to open"}
-          </button>
+          {inDiscardPhase ? (
+            <button
+              className="secondary"
+              disabled={!playerCanAct || pending || !selectedHandCardId}
+              onClick={() => void submitDiscardToOpen()}
+              type="button"
+            >
+              Discard to open
+            </button>
+          ) : game.deck.length > 0 ? (
+            <button
+              className="secondary"
+              disabled={!playerCanAct || pending}
+              onClick={() => void onDrawCard()}
+              type="button"
+            >
+              Draw
+            </button>
+          ) : (
+            <button
+              className="secondary"
+              disabled={!playerCanAct || pending || !selectedHandCardId}
+              onClick={() => void submitDiscardToOpen()}
+              type="button"
+            >
+              Discard to open
+            </button>
+          )}
         </div>
       </section>
     </section>

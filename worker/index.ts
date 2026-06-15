@@ -5,6 +5,7 @@ import {
   applyGameAction,
   createGameState,
   GAME_CATALOG,
+  getSeatOrderForGame,
   isGameKey,
   normalizeGameState,
   refreshGameState,
@@ -18,6 +19,7 @@ import type {
   GameKey,
   JoinResponse,
   LobbyAction,
+  PlayableSeatRole,
   RoomMember,
   PlayerIdentity,
   RoomPayload,
@@ -55,17 +57,24 @@ function generateRoomId(): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+function createSeatMap(seatOrder: PlayableSeatRole[]): Partial<Record<PlayableSeatRole, RoomSeat>> {
+  return Object.fromEntries(
+    seatOrder.map((seat) => [seat, { playerId: null, displayName: null } satisfies RoomSeat]),
+  ) as Partial<Record<PlayableSeatRole, RoomSeat>>;
+}
+
 function roomSnapshotFromState(state: RoomState): RoomSnapshot {
-  const hostJoined = state.host.playerId !== null;
-  const guestJoined = state.guest.playerId !== null;
-  const seatedPlayerCount = Number(hostJoined) + Number(guestJoined);
+  const seatedPlayerCount = state.seatOrder.reduce(
+    (total, seat) => total + Number(Boolean(state.seats[seat]?.playerId)),
+    0,
+  );
   const playerCount = state.members.length;
 
   return {
     ...state,
     playerCount,
     seatedPlayerCount,
-    status: seatedPlayerCount >= 2 ? "ready" : "waiting",
+    status: seatedPlayerCount >= state.seatOrder.length ? "ready" : "waiting",
   };
 }
 
@@ -244,8 +253,8 @@ export class GameRoom extends DurableObject<Env> {
       gameKey,
       createdAt: new Date().toISOString(),
       roomHostPlayerId: null,
-      host: { playerId: null, displayName: null },
-      guest: { playerId: null, displayName: null },
+      seatOrder: getSeatOrderForGame(gameKey),
+      seats: createSeatMap(getSeatOrderForGame(gameKey)),
       members: [],
     };
 
@@ -291,16 +300,17 @@ export class GameRoom extends DurableObject<Env> {
       stored.room.roomHostPlayerId = player.playerId;
     }
 
-    if (role === "host") {
-      stored.room.host = replaceSeat(stored.room.host, player);
-    } else if (role === "guest") {
-      stored.room.guest = replaceSeat(stored.room.guest, player);
-    } else if (!stored.room.host.playerId) {
-      stored.room.host = replaceSeat(stored.room.host, player);
-      nextRole = "host";
-    } else if (!stored.room.guest.playerId) {
-      stored.room.guest = replaceSeat(stored.room.guest, player);
-      nextRole = "guest";
+    if (role !== "spectator") {
+      stored.room.seats[role] = replaceSeat(stored.room.seats[role] ?? { playerId: null, displayName: null }, player);
+    } else {
+      const openSeat = stored.room.seatOrder.find((seatName) => !stored.room.seats[seatName]?.playerId);
+      if (openSeat) {
+        stored.room.seats[openSeat] = replaceSeat(
+          stored.room.seats[openSeat] ?? { playerId: null, displayName: null },
+          player,
+        );
+        nextRole = openSeat;
+      }
     }
 
     await this.ctx.storage.put("state", stored);
@@ -372,8 +382,8 @@ export class GameRoom extends DurableObject<Env> {
       throw new Error("Only the room host can start the room.");
     }
 
-    if (!stored.room.host.playerId || !stored.room.guest.playerId) {
-      throw new Error("Both seats must be filled before starting.");
+    if (stored.room.seatOrder.some((seat) => !stored.room.seats[seat]?.playerId)) {
+      throw new Error("All seats must be filled before starting.");
     }
 
     stored.game = startGameState(stored.room.gameKey, stored.game, new Date().toISOString());
@@ -445,28 +455,55 @@ export class GameRoom extends DurableObject<Env> {
     return {
       room: {
         ...stored.room,
-        roomHostPlayerId: stored.room.roomHostPlayerId ?? stored.room.host?.playerId ?? null,
-        host: stored.room.host ?? { playerId: null, displayName: null },
-        guest: stored.room.guest ?? { playerId: null, displayName: null },
+        roomHostPlayerId:
+          stored.room.roomHostPlayerId ??
+          stored.room.seats?.host?.playerId ??
+          stored.room.seats?.north?.playerId ??
+          null,
+        seatOrder:
+          stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey),
+        seats: (() => {
+          const seatOrder =
+            stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
+          const baseSeats = createSeatMap(seatOrder);
+          const normalizedSeats = stored.room.seats ?? {};
+          for (const seat of seatOrder) {
+            baseSeats[seat] =
+              normalizedSeats[seat] ??
+              (seat === "host" && "host" in stored.room
+                ? (stored.room as RoomState & { host?: RoomSeat }).host
+                : seat === "guest" && "guest" in stored.room
+                  ? (stored.room as RoomState & { guest?: RoomSeat }).guest
+                  : undefined) ?? { playerId: null, displayName: null };
+          }
+          return baseSeats;
+        })(),
         members:
           stored.room.members?.length
             ? stored.room.members
-            : [
-                stored.room.host?.playerId
-                  ? {
-                      playerId: stored.room.host.playerId,
-                      displayName: stored.room.host.displayName ?? "Host",
-                      joinedAt: stored.room.createdAt,
-                    }
-                  : null,
-                stored.room.guest?.playerId
-                  ? {
-                      playerId: stored.room.guest.playerId,
-                      displayName: stored.room.guest.displayName ?? "Guest",
-                      joinedAt: stored.room.createdAt,
-                    }
-                  : null,
-              ].filter((member): member is RoomMember => member !== null),
+            : (() => {
+                const seatOrder =
+                  stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
+                const baseSeats = createSeatMap(seatOrder);
+                const normalizedSeats = stored.room.seats ?? {};
+                for (const seat of seatOrder) {
+                  baseSeats[seat] =
+                    normalizedSeats[seat] ??
+                    (seat === "host" && "host" in stored.room
+                      ? (stored.room as RoomState & { host?: RoomSeat }).host
+                      : seat === "guest" && "guest" in stored.room
+                        ? (stored.room as RoomState & { guest?: RoomSeat }).guest
+                        : undefined) ?? { playerId: null, displayName: null };
+                }
+
+                return Object.values(baseSeats)
+                  .filter((seat): seat is RoomSeat => Boolean(seat?.playerId))
+                  .map((seat) => ({
+                    playerId: seat.playerId as string,
+                    displayName: seat.displayName ?? "Player",
+                    joinedAt: stored.room.createdAt,
+                  }));
+              })(),
       },
       game: normalizeGameState(stored.room.gameKey, stored.game),
     };
@@ -480,38 +517,38 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   private resolveSeatRole(room: RoomState, playerId: string): SeatRole {
-    if (room.host.playerId === playerId) return "host";
-    if (room.guest.playerId === playerId) return "guest";
+    for (const seat of room.seatOrder) {
+      if (room.seats[seat]?.playerId === playerId) {
+        return seat;
+      }
+    }
     return "spectator";
   }
 
-  private assignSeat(room: RoomState, memberId: string, seat: "host" | "guest"): void {
+  private assignSeat(room: RoomState, memberId: string, seat: PlayableSeatRole): void {
     const member = room.members.find((entry) => entry.playerId === memberId);
     if (!member) {
       throw new Error("Selected member is not in the room.");
     }
 
-    if (seat === "host") {
-      if (room.guest.playerId === memberId) {
-        room.guest = { playerId: null, displayName: null };
-      }
-      room.host = { playerId: member.playerId, displayName: member.displayName };
-      return;
+    if (!room.seatOrder.includes(seat)) {
+      throw new Error("That seat is not available for this game.");
     }
 
-    if (room.host.playerId === memberId) {
-      room.host = { playerId: null, displayName: null };
+    for (const seatName of room.seatOrder) {
+      if (room.seats[seatName]?.playerId === memberId) {
+        room.seats[seatName] = { playerId: null, displayName: null };
+      }
     }
-    room.guest = { playerId: member.playerId, displayName: member.displayName };
+    room.seats[seat] = { playerId: member.playerId, displayName: member.displayName };
   }
 
-  private clearSeat(room: RoomState, seat: "host" | "guest"): void {
-    if (seat === "host") {
-      room.host = { playerId: null, displayName: null };
-      return;
+  private clearSeat(room: RoomState, seat: PlayableSeatRole): void {
+    if (!room.seatOrder.includes(seat)) {
+      throw new Error("That seat is not available for this game.");
     }
 
-    room.guest = { playerId: null, displayName: null };
+    room.seats[seat] = { playerId: null, displayName: null };
   }
 
   private transferRoomHost(room: RoomState, memberId: string): void {

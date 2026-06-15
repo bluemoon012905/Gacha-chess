@@ -31,6 +31,8 @@ export type FourteenPointsState = {
   key: "fourteen-points";
   status: "waiting" | "active" | "complete";
   activeSeat: Extract<SeatRole, "host" | "guest">;
+  turnPhase: "action" | "discard";
+  discardSource: "draw" | "capture" | null;
   deck: PlayingCard[];
   openCards: PlayingCard[];
   hostHand: PlayingCard[];

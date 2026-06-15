@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { ChessRoomView } from "./games/chess/ChessRoomView";
+import { FiveTenKingRoomView } from "./games/five-ten-king/FiveTenKingRoomView";
 import { FourteenPointsRoomView } from "./games/fourteen-points/FourteenPointsRoomView";
 import { getOrCreatePlayerIdentity } from "./lib/player";
 import { getRoomIdFromPath } from "./lib/routes";
 import { GAME_CATALOG, getGameCatalogEntry } from "../shared/games";
 import type { ChessState, HostColorChoice, TimerPreset } from "../shared/chess";
+import type { FiveTenKingState } from "../shared/five-ten-king";
 import type { FourteenPointsState } from "../shared/fourteen-points";
 import type {
   AnyGameState,
@@ -14,6 +16,7 @@ import type {
   GameKey,
   JoinResponse,
   LobbyAction,
+  PlayableSeatRole,
   RoomPayload,
   RoomSnapshot,
   SeatRole,
@@ -36,11 +39,40 @@ const COLOR_OPTIONS: Array<{ value: HostColorChoice; label: string }> = [
   { value: "black", label: "Play black" },
 ];
 
+const FIVE_TEN_KING_SEAT_OPTIONS: Array<{ value: PlayableSeatRole; label: string }> = [
+  { value: "north", label: "North" },
+  { value: "east", label: "East" },
+  { value: "south", label: "South" },
+  { value: "west", label: "West" },
+];
+
 function getSeatRole(room: RoomSnapshot | null, playerId: string): SeatRole {
   if (!room) return "spectator";
-  if (room.host.playerId === playerId) return "host";
-  if (room.guest.playerId === playerId) return "guest";
+  for (const seat of room.seatOrder) {
+    if (room.seats[seat]?.playerId === playerId) return seat;
+  }
   return "spectator";
+}
+
+function getSeatLabel(seat: PlayableSeatRole): string {
+  switch (seat) {
+    case "host":
+      return "Seat A";
+    case "guest":
+      return "Seat B";
+    case "north":
+      return "North";
+    case "east":
+      return "East";
+    case "south":
+      return "South";
+    case "west":
+      return "West";
+  }
+}
+
+function getMaxFiveTenKingCardsPerPlayer(deckCount: number): number {
+  return Math.floor((Math.max(1, deckCount) * 54) / 4);
 }
 
 function formatTimestamp(value: string): string {
@@ -67,10 +99,20 @@ function HomePage({
   error,
   createTimer,
   createHostColor,
+  createFiveTenKingDeckCount,
+  createFiveTenKingPointsToWin,
+  createFiveTenKingCardsPerPlayer,
+  createFiveTenKingDoubleJokerOverQuad,
+  createFiveTenKingIntersectEnabled,
   onGameSelect,
   onJoinCodeChange,
   onCreateTimerChange,
   onCreateHostColorChange,
+  onCreateFiveTenKingDeckCountChange,
+  onCreateFiveTenKingPointsToWinChange,
+  onCreateFiveTenKingCardsPerPlayerChange,
+  onCreateFiveTenKingDoubleJokerOverQuadChange,
+  onCreateFiveTenKingIntersectEnabledChange,
   onCreateRoom,
   onJoinRoom,
 }: {
@@ -81,10 +123,20 @@ function HomePage({
   error: string | null;
   createTimer: TimerPreset;
   createHostColor: HostColorChoice;
+  createFiveTenKingDeckCount: number;
+  createFiveTenKingPointsToWin: number;
+  createFiveTenKingCardsPerPlayer: number;
+  createFiveTenKingDoubleJokerOverQuad: boolean;
+  createFiveTenKingIntersectEnabled: boolean;
   onGameSelect: (value: GameKey) => void;
   onJoinCodeChange: (value: string) => void;
   onCreateTimerChange: (value: TimerPreset) => void;
   onCreateHostColorChange: (value: HostColorChoice) => void;
+  onCreateFiveTenKingDeckCountChange: (value: number) => void;
+  onCreateFiveTenKingPointsToWinChange: (value: number) => void;
+  onCreateFiveTenKingCardsPerPlayerChange: (value: number) => void;
+  onCreateFiveTenKingDoubleJokerOverQuadChange: (value: boolean) => void;
+  onCreateFiveTenKingIntersectEnabledChange: (value: boolean) => void;
   onCreateRoom: () => Promise<void>;
   onJoinRoom: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -167,6 +219,67 @@ function HomePage({
                   </select>
                 </label>
               </div>
+            ) : gameKey === "five-ten-king" ? (
+              <div className="join-form">
+                <label>
+                  Deck count
+                  <input
+                    disabled={pending}
+                    min={1}
+                    max={4}
+                    onChange={(event) => onCreateFiveTenKingDeckCountChange(Number(event.target.value))}
+                    type="number"
+                    value={createFiveTenKingDeckCount}
+                  />
+                </label>
+                <label>
+                  Points to win
+                  <input
+                    disabled={pending}
+                    min={10}
+                    onChange={(event) => onCreateFiveTenKingPointsToWinChange(Number(event.target.value))}
+                    type="number"
+                    value={createFiveTenKingPointsToWin}
+                  />
+                </label>
+                <label>
+                  Cards each
+                  <input
+                    disabled={pending}
+                    min={1}
+                    max={getMaxFiveTenKingCardsPerPlayer(createFiveTenKingDeckCount)}
+                    onChange={(event) => onCreateFiveTenKingCardsPerPlayerChange(Number(event.target.value))}
+                    type="number"
+                    value={createFiveTenKingCardsPerPlayer}
+                  />
+                </label>
+                <label>
+                  Double joker over quad
+                  <select
+                    disabled={pending}
+                    onChange={(event) =>
+                      onCreateFiveTenKingDoubleJokerOverQuadChange(event.target.value === "true")
+                    }
+                    value={String(createFiveTenKingDoubleJokerOverQuad)}
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </label>
+                <label>
+                  Intersect
+                  <select
+                    disabled={pending}
+                    onChange={(event) =>
+                      onCreateFiveTenKingIntersectEnabledChange(event.target.value === "true")
+                    }
+                    value={String(createFiveTenKingIntersectEnabled)}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </label>
+              </div>
             ) : null}
             <button disabled={pending} onClick={() => void onCreateRoom()} type="button">
               {pending ? "Starting..." : "Create room"}
@@ -219,16 +332,30 @@ function RoomPage({
   error,
   configTimer,
   configHostColor,
+  configFiveTenKingDeckCount,
+  configFiveTenKingPointsToWin,
+  configFiveTenKingCardsPerPlayer,
+  configFiveTenKingDoubleJokerOverQuad,
+  configFiveTenKingIntersectEnabled,
   onClaimSeat,
   onSaveConfiguration,
   onTimerChange,
   onHostColorChange,
+  onFiveTenKingDeckCountChange,
+  onFiveTenKingPointsToWinChange,
+  onFiveTenKingCardsPerPlayerChange,
+  onFiveTenKingDoubleJokerOverQuadChange,
+  onFiveTenKingIntersectEnabledChange,
   onStartGame,
   onCopyInvite,
   onLobbyAction,
   onMove,
   onCapture,
-  onDrawAndDiscard,
+  onDrawCard,
+  onDiscardToOpen,
+  onPlayFiveTenKingCards,
+  onPassFiveTenKing,
+  onIntersectFiveTenKing,
 }: {
   roomId: string;
   roomState: RoomSnapshot | null;
@@ -243,25 +370,43 @@ function RoomPage({
   error: string | null;
   configTimer: TimerPreset;
   configHostColor: HostColorChoice;
+  configFiveTenKingDeckCount: number;
+  configFiveTenKingPointsToWin: number;
+  configFiveTenKingCardsPerPlayer: number;
+  configFiveTenKingDoubleJokerOverQuad: boolean;
+  configFiveTenKingIntersectEnabled: boolean;
   onClaimSeat: () => Promise<void>;
   onSaveConfiguration: () => Promise<void>;
   onTimerChange: (value: TimerPreset) => void;
   onHostColorChange: (value: HostColorChoice) => void;
+  onFiveTenKingDeckCountChange: (value: number) => void;
+  onFiveTenKingPointsToWinChange: (value: number) => void;
+  onFiveTenKingCardsPerPlayerChange: (value: number) => void;
+  onFiveTenKingDoubleJokerOverQuadChange: (value: boolean) => void;
+  onFiveTenKingIntersectEnabledChange: (value: boolean) => void;
   onStartGame: () => Promise<void>;
   onCopyInvite: () => Promise<void>;
   onLobbyAction: (action: LobbyAction) => Promise<void>;
   onMove: (from: string, to: string) => Promise<void>;
   onCapture: (handCardId: string, openCardIds: string[]) => Promise<void>;
-  onDrawAndDiscard: (discardCardId: string) => Promise<void>;
+  onDrawCard: () => Promise<void>;
+  onDiscardToOpen: (discardCardId: string) => Promise<void>;
+  onPlayFiveTenKingCards: (cardIds: string[]) => Promise<void>;
+  onPassFiveTenKing: () => Promise<void>;
+  onIntersectFiveTenKing: (cardIds: string[]) => Promise<void>;
 }) {
   const gameMeta = roomState ? getGameCatalogEntry(roomState.gameKey) : null;
   const chessState = gameState?.key === "chess" ? (gameState as ChessState) : null;
   const fourteenPointsState =
     gameState?.key === "fourteen-points" ? (gameState as FourteenPointsState) : null;
+  const fiveTenKingState =
+    gameState?.key === "five-ten-king" ? (gameState as FiveTenKingState) : null;
   const hasGameStarted = chessState
     ? chessState.status !== "waiting"
     : fourteenPointsState
       ? fourteenPointsState.status !== "waiting"
+      : fiveTenKingState
+        ? fiveTenKingState.status !== "waiting"
       : false;
 
   return (
@@ -280,7 +425,7 @@ function RoomPage({
 
             <section className="panel-card page-note">
               <p>
-                Share this code, seat two players, then start when the table is ready.
+                Share this code, fill the required seats, then start when the table is ready.
               </p>
             </section>
 
@@ -310,31 +455,33 @@ function RoomPage({
               </article>
               <article className="seat-card">
                 <span>Your seat</span>
-                <strong>{isRoomHost ? `${joinRole} · room host` : joinRole}</strong>
+                <strong>
+                  {isRoomHost
+                    ? `${joinRole === "spectator" ? "spectator" : getSeatLabel(joinRole)} · room host`
+                    : joinRole === "spectator"
+                      ? "spectator"
+                      : getSeatLabel(joinRole)}
+                </strong>
               </article>
               <article className="seat-card">
                 <span>Seats filled</span>
                 <strong>
-                  {roomState ? `${roomState.seatedPlayerCount}/2 seated` : "..."}
+                  {roomState ? `${roomState.seatedPlayerCount}/${roomState.seatOrder.length} seated` : "..."}
                 </strong>
               </article>
             </div>
 
             <div className="seat-grid">
-              <article className="seat-card">
-                <span>Seat A</span>
-                <strong>
-                  {roomState?.host.displayName ?? "Open seat"}
-                  {chessState ? ` · ${chessState.hostColor}` : ""}
-                </strong>
-              </article>
-              <article className="seat-card">
-                <span>Seat B</span>
-                <strong>
-                  {roomState?.guest.displayName ?? "Open seat"}
-                  {chessState ? ` · ${chessState.guestColor}` : ""}
-                </strong>
-              </article>
+              {roomState?.seatOrder.map((seat) => (
+                <article className="seat-card" key={seat}>
+                  <span>{getSeatLabel(seat)}</span>
+                  <strong>
+                    {roomState.seats[seat]?.displayName ?? "Open seat"}
+                    {chessState && seat === "host" ? ` · ${chessState.hostColor}` : ""}
+                    {chessState && seat === "guest" ? ` · ${chessState.guestColor}` : ""}
+                  </strong>
+                </article>
+              ))}
             </div>
 
             <div className="panel-card">
@@ -353,40 +500,32 @@ function RoomPage({
                       <span>
                         {member.playerId === roomState.roomHostPlayerId
                           ? "Room host"
-                          : member.playerId === roomState.host.playerId
-                            ? "Seat A"
-                            : member.playerId === roomState.guest.playerId
-                              ? "Seat B"
-                              : "Watcher"}
+                          : roomState.seatOrder.find((seat) => roomState.seats[seat]?.playerId === member.playerId)
+                            ? getSeatLabel(
+                                roomState.seatOrder.find(
+                                  (seat) => roomState.seats[seat]?.playerId === member.playerId,
+                                ) as PlayableSeatRole,
+                              )
+                            : "Watcher"}
                       </span>
                       {isRoomHost ? (
                         <div className="member-actions">
-                          <button
-                            className="secondary"
-                            disabled={pending}
-                            onClick={() =>
-                              void onLobbyAction({
-                                type: "assign_seat",
-                                payload: { memberId: member.playerId, seat: "host" },
-                              })
-                            }
-                            type="button"
-                          >
-                            Make Seat A
-                          </button>
-                          <button
-                            className="secondary"
-                            disabled={pending}
-                            onClick={() =>
-                              void onLobbyAction({
-                                type: "assign_seat",
-                                payload: { memberId: member.playerId, seat: "guest" },
-                              })
-                            }
-                            type="button"
-                          >
-                            Make Seat B
-                          </button>
+                          {roomState.seatOrder.map((seat) => (
+                            <button
+                              className="secondary"
+                              disabled={pending}
+                              key={`${member.playerId}-${seat}`}
+                              onClick={() =>
+                                void onLobbyAction({
+                                  type: "assign_seat",
+                                  payload: { memberId: member.playerId, seat },
+                                })
+                              }
+                              type="button"
+                            >
+                              {`Make ${getSeatLabel(seat)}`}
+                            </button>
+                          ))}
                           <button
                             className="secondary"
                             disabled={pending || member.playerId === roomState.roomHostPlayerId}
@@ -410,22 +549,17 @@ function RoomPage({
               )}
               {isRoomHost ? (
                 <div className="setup-actions">
-                  <button
-                    className="secondary"
-                    disabled={pending || !roomState?.host.playerId}
-                    onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "host" } })}
-                    type="button"
-                  >
-                    Clear Seat A
-                  </button>
-                  <button
-                    className="secondary"
-                    disabled={pending || !roomState?.guest.playerId}
-                    onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "guest" } })}
-                    type="button"
-                  >
-                    Clear Seat B
-                  </button>
+                  {roomState?.seatOrder.map((seat) => (
+                    <button
+                      className="secondary"
+                      disabled={pending || !roomState.seats[seat]?.playerId}
+                      key={`clear-${seat}`}
+                      onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat } })}
+                      type="button"
+                    >
+                      {`Clear ${getSeatLabel(seat)}`}
+                    </button>
+                  ))}
                 </div>
               ) : null}
             </div>
@@ -503,10 +637,103 @@ function RoomPage({
                   </button>
                 </div>
               </div>
+            ) : fiveTenKingState ? (
+              <div className="setup-panel">
+                <div className="section-heading">
+                  <span className="panel-index">Setup</span>
+                  <div>
+                    <h2>Table rules</h2>
+                    <p>Only the room host can edit these before the game starts.</p>
+                  </div>
+                </div>
+                <div className="setup-row">
+                  <label>
+                    Deck count
+                    <input
+                      disabled={!isRoomHost || fiveTenKingState.status !== "waiting" || pending}
+                      min={1}
+                      max={4}
+                      onChange={(event) => onFiveTenKingDeckCountChange(Number(event.target.value))}
+                      type="number"
+                      value={configFiveTenKingDeckCount}
+                    />
+                  </label>
+                  <label>
+                    Points to win
+                    <input
+                      disabled={!isRoomHost || fiveTenKingState.status !== "waiting" || pending}
+                      min={10}
+                      onChange={(event) => onFiveTenKingPointsToWinChange(Number(event.target.value))}
+                      type="number"
+                      value={configFiveTenKingPointsToWin}
+                    />
+                  </label>
+                  <label>
+                    Cards each
+                    <input
+                      disabled={!isRoomHost || fiveTenKingState.status !== "waiting" || pending}
+                      min={1}
+                      max={getMaxFiveTenKingCardsPerPlayer(configFiveTenKingDeckCount)}
+                      onChange={(event) => onFiveTenKingCardsPerPlayerChange(Number(event.target.value))}
+                      type="number"
+                      value={configFiveTenKingCardsPerPlayer}
+                    />
+                  </label>
+                  <label>
+                    Double joker over quad
+                    <select
+                      disabled={!isRoomHost || fiveTenKingState.status !== "waiting" || pending}
+                      onChange={(event) =>
+                        onFiveTenKingDoubleJokerOverQuadChange(event.target.value === "true")
+                      }
+                      value={String(configFiveTenKingDoubleJokerOverQuad)}
+                    >
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </label>
+                  <label>
+                    Intersect
+                    <select
+                      disabled={!isRoomHost || fiveTenKingState.status !== "waiting" || pending}
+                      onChange={(event) =>
+                        onFiveTenKingIntersectEnabledChange(event.target.value === "true")
+                      }
+                      value={String(configFiveTenKingIntersectEnabled)}
+                    >
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="setup-actions">
+                  <button
+                    className="secondary"
+                    disabled={!isRoomHost || pending || fiveTenKingState.status !== "waiting"}
+                    onClick={() => void onSaveConfiguration()}
+                    type="button"
+                  >
+                    Save settings
+                  </button>
+                  <button
+                    disabled={
+                      !isRoomHost ||
+                      pending ||
+                      roomState?.status !== "ready" ||
+                      fiveTenKingState.status !== "waiting"
+                    }
+                    onClick={() => void onStartGame()}
+                    type="button"
+                  >
+                    Start match
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="setup-panel">
                 <p className="status-line">
-                  Spectators can watch, but two seated players are required to begin.
+                  Spectators can watch, but every required seat must be filled before the match starts.
                 </p>
                 <div className="setup-actions">
                   <button
@@ -556,7 +783,17 @@ function RoomPage({
               game={fourteenPointsState}
               joinRole={joinRole}
               onCapture={onCapture}
-              onDrawAndDiscard={onDrawAndDiscard}
+              onDiscardToOpen={onDiscardToOpen}
+              onDrawCard={onDrawCard}
+              pending={gameActionPending}
+            />
+          ) : hasGameStarted && fiveTenKingState ? (
+            <FiveTenKingRoomView
+              game={fiveTenKingState}
+              joinRole={joinRole}
+              onIntersect={onIntersectFiveTenKing}
+              onPass={onPassFiveTenKing}
+              onPlayCards={onPlayFiveTenKingCards}
               pending={gameActionPending}
             />
           ) : roomState ? (
@@ -595,6 +832,16 @@ export default function App() {
   const [createHostColor, setCreateHostColor] = useState<HostColorChoice>("white");
   const [configTimer, setConfigTimer] = useState<TimerPreset>(300_000);
   const [configHostColor, setConfigHostColor] = useState<HostColorChoice>("white");
+  const [createFiveTenKingDeckCount, setCreateFiveTenKingDeckCount] = useState(2);
+  const [createFiveTenKingPointsToWin, setCreateFiveTenKingPointsToWin] = useState(200);
+  const [createFiveTenKingCardsPerPlayer, setCreateFiveTenKingCardsPerPlayer] = useState(27);
+  const [createFiveTenKingDoubleJokerOverQuad, setCreateFiveTenKingDoubleJokerOverQuad] = useState(false);
+  const [createFiveTenKingIntersectEnabled, setCreateFiveTenKingIntersectEnabled] = useState(true);
+  const [configFiveTenKingDeckCount, setConfigFiveTenKingDeckCount] = useState(2);
+  const [configFiveTenKingPointsToWin, setConfigFiveTenKingPointsToWin] = useState(200);
+  const [configFiveTenKingCardsPerPlayer, setConfigFiveTenKingCardsPerPlayer] = useState(27);
+  const [configFiveTenKingDoubleJokerOverQuad, setConfigFiveTenKingDoubleJokerOverQuad] = useState(false);
+  const [configFiveTenKingIntersectEnabled, setConfigFiveTenKingIntersectEnabled] = useState(true);
   const joinRole = getSeatRole(roomState, player.playerId);
   const isMember = isRoomMember(roomState, player.playerId);
   const isRoomHost = roomState?.roomHostPlayerId === player.playerId;
@@ -604,6 +851,31 @@ export default function App() {
     setConfigTimer(gameState.timerMs);
     setConfigHostColor(gameState.hostColor);
   }, [gameState]);
+
+  useEffect(() => {
+    if (!gameState || gameState.key !== "five-ten-king") return;
+    setConfigFiveTenKingDeckCount(gameState.config.deckCount);
+    setConfigFiveTenKingPointsToWin(gameState.config.pointsToWin);
+    setConfigFiveTenKingCardsPerPlayer(gameState.config.cardsPerPlayer);
+    setConfigFiveTenKingDoubleJokerOverQuad(gameState.config.doubleJokerOverQuad);
+    setConfigFiveTenKingIntersectEnabled(gameState.config.intersectEnabled);
+  }, [gameState]);
+
+  function updateCreateFiveTenKingDeckCount(deckCount: number) {
+    const nextDeckCount = Math.max(1, Math.min(4, Math.floor(deckCount || 1)));
+    setCreateFiveTenKingDeckCount(nextDeckCount);
+    setCreateFiveTenKingCardsPerPlayer((current) =>
+      Math.min(Math.max(1, current), getMaxFiveTenKingCardsPerPlayer(nextDeckCount)),
+    );
+  }
+
+  function updateConfigFiveTenKingDeckCount(deckCount: number) {
+    const nextDeckCount = Math.max(1, Math.min(4, Math.floor(deckCount || 1)));
+    setConfigFiveTenKingDeckCount(nextDeckCount);
+    setConfigFiveTenKingCardsPerPlayer((current) =>
+      Math.min(Math.max(1, current), getMaxFiveTenKingCardsPerPlayer(nextDeckCount)),
+    );
+  }
 
   useEffect(() => {
     if (!roomId) return;
@@ -707,6 +979,14 @@ export default function App() {
                   timerMs: createTimer,
                   hostColor: createHostColor,
                 }
+              : selectedGame === "five-ten-king"
+                ? {
+                    deckCount: createFiveTenKingDeckCount,
+                    pointsToWin: createFiveTenKingPointsToWin,
+                    cardsPerPlayer: createFiveTenKingCardsPerPlayer,
+                    doubleJokerOverQuad: createFiveTenKingDoubleJokerOverQuad,
+                    intersectEnabled: createFiveTenKingIntersectEnabled,
+                  }
               : undefined,
         }),
       });
@@ -764,7 +1044,7 @@ export default function App() {
       setMessage(
         payload.role === "spectator"
           ? `You joined the room as ${payload.playerName}. The player seats are already taken.`
-          : `You joined the room as ${payload.playerName} and claimed the ${payload.role} seat.`,
+          : `You joined the room as ${payload.playerName} and claimed ${getSeatLabel(payload.role)}.`,
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not join room.");
@@ -821,10 +1101,20 @@ export default function App() {
           "x-player-id": player.playerId,
           "x-player-name": player.displayName,
         },
-        body: JSON.stringify({
-          timerMs: configTimer,
-          hostColor: configHostColor,
-        }),
+        body: JSON.stringify(
+          gameState?.key === "chess"
+            ? {
+                timerMs: configTimer,
+                hostColor: configHostColor,
+              }
+            : {
+                deckCount: configFiveTenKingDeckCount,
+                pointsToWin: configFiveTenKingPointsToWin,
+                cardsPerPlayer: configFiveTenKingCardsPerPlayer,
+                doubleJokerOverQuad: configFiveTenKingDoubleJokerOverQuad,
+                intersectEnabled: configFiveTenKingIntersectEnabled,
+              },
+        ),
       });
 
       const payload = (await response.json()) as RoomPayload & { error?: string };
@@ -917,16 +1207,47 @@ export default function App() {
     });
   }
 
-  async function drawAndDiscardFourteenPoints(discardCardId: string) {
+  async function drawCardFourteenPoints() {
     await sendAction({
-      type: "draw_and_discard",
+      type: "draw_card",
+    });
+  }
+
+  async function discardToOpenFourteenPoints(discardCardId: string) {
+    await sendAction({
+      type: "discard_to_open",
       payload: { discardCardId },
+    });
+  }
+
+  async function playFiveTenKingCards(cardIds: string[]) {
+    await sendAction({
+      type: "play_cards",
+      payload: { cardIds },
+    });
+  }
+
+  async function passFiveTenKing() {
+    await sendAction({
+      type: "pass_turn",
+    });
+  }
+
+  async function intersectFiveTenKing(cardIds: string[]) {
+    await sendAction({
+      type: "intersect_play",
+      payload: { cardIds },
     });
   }
 
   if (!roomId) {
     return (
       <HomePage
+        createFiveTenKingCardsPerPlayer={createFiveTenKingCardsPerPlayer}
+        createFiveTenKingDeckCount={createFiveTenKingDeckCount}
+        createFiveTenKingDoubleJokerOverQuad={createFiveTenKingDoubleJokerOverQuad}
+        createFiveTenKingIntersectEnabled={createFiveTenKingIntersectEnabled}
+        createFiveTenKingPointsToWin={createFiveTenKingPointsToWin}
         error={error}
         gameKey={selectedGame}
         joinCode={joinCode}
@@ -934,6 +1255,11 @@ export default function App() {
         createHostColor={createHostColor}
         createTimer={createTimer}
         onCreateRoom={createRoom}
+        onCreateFiveTenKingCardsPerPlayerChange={setCreateFiveTenKingCardsPerPlayer}
+        onCreateFiveTenKingDeckCountChange={updateCreateFiveTenKingDeckCount}
+        onCreateFiveTenKingDoubleJokerOverQuadChange={setCreateFiveTenKingDoubleJokerOverQuad}
+        onCreateFiveTenKingIntersectEnabledChange={setCreateFiveTenKingIntersectEnabled}
+        onCreateFiveTenKingPointsToWinChange={setCreateFiveTenKingPointsToWin}
         onCreateHostColorChange={setCreateHostColor}
         onCreateTimerChange={setCreateTimer}
         onGameSelect={setSelectedGame}
@@ -946,6 +1272,11 @@ export default function App() {
 
   return (
     <RoomPage
+      configFiveTenKingCardsPerPlayer={configFiveTenKingCardsPerPlayer}
+      configFiveTenKingDeckCount={configFiveTenKingDeckCount}
+      configFiveTenKingDoubleJokerOverQuad={configFiveTenKingDoubleJokerOverQuad}
+      configFiveTenKingIntersectEnabled={configFiveTenKingIntersectEnabled}
+      configFiveTenKingPointsToWin={configFiveTenKingPointsToWin}
       configHostColor={configHostColor}
       configTimer={configTimer}
       error={error}
@@ -958,10 +1289,19 @@ export default function App() {
       onCapture={captureFourteenPoints}
       onClaimSeat={claimSeat}
       onCopyInvite={copyInvite}
-      onDrawAndDiscard={drawAndDiscardFourteenPoints}
+      onDiscardToOpen={discardToOpenFourteenPoints}
+      onDrawCard={drawCardFourteenPoints}
+      onFiveTenKingCardsPerPlayerChange={setConfigFiveTenKingCardsPerPlayer}
+      onFiveTenKingDeckCountChange={updateConfigFiveTenKingDeckCount}
+      onFiveTenKingDoubleJokerOverQuadChange={setConfigFiveTenKingDoubleJokerOverQuad}
+      onFiveTenKingIntersectEnabledChange={setConfigFiveTenKingIntersectEnabled}
+      onFiveTenKingPointsToWinChange={setConfigFiveTenKingPointsToWin}
+      onIntersectFiveTenKing={intersectFiveTenKing}
       onLobbyAction={updateLobby}
       onMove={(from, to) => sendAction({ type: "move", payload: { from, to } })}
       onHostColorChange={setConfigHostColor}
+      onPassFiveTenKing={passFiveTenKing}
+      onPlayFiveTenKingCards={playFiveTenKingCards}
       onSaveConfiguration={saveConfiguration}
       onStartGame={startGame}
       onTimerChange={setConfigTimer}

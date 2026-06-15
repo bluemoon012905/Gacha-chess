@@ -6,6 +6,7 @@ export const FOURTEEN_POINTS_GAME_META: GameCatalogEntry = {
   name: "14 Points",
   summary: "Capture open cards by totaling 14, then win on suit-weighted scoring.",
   accent: "Card Table",
+  seatOrder: ["host", "guest"],
 };
 
 const SUIT_SCORES: Record<CardSuit, number> = {
@@ -39,6 +40,8 @@ export function createFourteenPointsGameState(): FourteenPointsState {
     key: "fourteen-points",
     status: "waiting",
     activeSeat: "host",
+    turnPhase: "action",
+    discardSource: null,
     deck: [],
     openCards: [],
     hostHand: [],
@@ -62,6 +65,8 @@ export function startFourteenPointsGame(_: FourteenPointsState): FourteenPointsS
     key: "fourteen-points",
     status: "active",
     activeSeat: "host",
+    turnPhase: "action",
+    discardSource: null,
     deck: remainingDeck,
     openCards,
     hostHand,
@@ -97,8 +102,10 @@ export function applyFourteenPointsAction(
   switch (action.type) {
     case "capture_cards":
       return finalizeTurn(applyCapture(state, seat, action.payload.handCardId, action.payload.openCardIds));
-    case "draw_and_discard":
-      return finalizeTurn(applyDrawAndDiscard(state, seat, action.payload.discardCardId));
+    case "draw_card":
+      return finalizeTurn(applyDraw(state, seat));
+    case "discard_to_open":
+      return finalizeTurn(applyDiscardToOpen(state, seat, action.payload.discardCardId));
     default:
       throw new Error("Unsupported 14 points action.");
   }
@@ -119,6 +126,8 @@ export function normalizeFourteenPointsState(state: FourteenPointsState): Fourte
     winner: state.winner ?? null,
     lastAction: state.lastAction ?? null,
     activeSeat: state.activeSeat ?? "host",
+    turnPhase: state.turnPhase ?? "action",
+    discardSource: state.discardSource ?? null,
   };
 }
 
@@ -132,6 +141,10 @@ function applyCapture(
   handCardId: string,
   openCardIds: string[],
 ): FourteenPointsState {
+  if (state.turnPhase !== "action") {
+    throw new Error("Discard a card before ending your turn.");
+  }
+
   if (openCardIds.length === 0) {
     throw new Error("Choose at least one open card to capture.");
   }
@@ -161,11 +174,37 @@ function applyCapture(
   const nextHand = hand.filter((card) => card.id !== handCardId);
   const nextOpen = state.openCards.filter((card) => !uniqueOpenIds.has(card.id));
   const nextCaptured = [...capturedPile, handCard, ...openSelection];
+  const qualifiesForCaptureDraw = state.openCards.length === 4;
 
   let nextState: FourteenPointsState =
     seat === "host"
       ? { ...state, hostHand: nextHand, openCards: nextOpen, hostCaptured: nextCaptured }
       : { ...state, guestHand: nextHand, openCards: nextOpen, guestCaptured: nextCaptured };
+
+  nextState = updateScores(nextState);
+
+  if (qualifiesForCaptureDraw && nextState.deck.length > 0) {
+    const { drawn, rest } = drawCards(nextState.deck, 2);
+    if (drawn.length > 0) {
+      return seat === "host"
+        ? {
+            ...nextState,
+            deck: rest,
+            hostHand: [...nextState.hostHand, ...drawn],
+            turnPhase: "discard",
+            discardSource: "capture",
+            lastAction: `${seat} captured ${openSelection.length + 1} cards for 14 and drew ${drawn.length} card${drawn.length === 1 ? "" : "s"}. Choose 1 to place into the open.`,
+          }
+        : {
+            ...nextState,
+            deck: rest,
+            guestHand: [...nextState.guestHand, ...drawn],
+            turnPhase: "discard",
+            discardSource: "capture",
+            lastAction: `${seat} captured ${openSelection.length + 1} cards for 14 and drew ${drawn.length} card${drawn.length === 1 ? "" : "s"}. Choose 1 to place into the open.`,
+          };
+    }
+  }
 
   nextState = refillHand(nextState, seat);
   nextState = refillOpen(nextState);
@@ -174,25 +213,56 @@ function applyCapture(
   return {
     ...nextState,
     activeSeat: otherSeat(seat),
+    turnPhase: "action",
+    discardSource: null,
     lastAction: `${seat} captured ${openSelection.length + 1} cards for 14.`,
   };
 }
 
-function applyDrawAndDiscard(
+function applyDraw(
+  state: FourteenPointsState,
+  seat: "host" | "guest",
+): FourteenPointsState {
+  if (state.turnPhase !== "action") {
+    throw new Error("You already drew this turn. Discard a card to continue.");
+  }
+
+  if (state.deck.length === 0) {
+    throw new Error("The deck is empty. Choose a card to place into the open area.");
+  }
+
+  const drawnCard = state.deck[0];
+  const deck = state.deck.slice(1);
+
+  return seat === "host"
+    ? {
+        ...state,
+        deck,
+        hostHand: [...state.hostHand, drawnCard],
+        turnPhase: "discard",
+        discardSource: "draw",
+        lastAction: `${seat} drew ${drawnCard.shortLabel}. Choose a card to place into the open.`,
+      }
+    : {
+        ...state,
+        deck,
+        guestHand: [...state.guestHand, drawnCard],
+        turnPhase: "discard",
+        discardSource: "draw",
+        lastAction: `${seat} drew ${drawnCard.shortLabel}. Choose a card to place into the open.`,
+      };
+}
+
+function applyDiscardToOpen(
   state: FourteenPointsState,
   seat: "host" | "guest",
   discardCardId: string,
 ): FourteenPointsState {
-  let hand = seat === "host" ? [...state.hostHand] : [...state.guestHand];
-  let deck = [...state.deck];
-  let drewCard = false;
-
-  if (deck.length > 0) {
-    hand.push(deck[0]);
-    deck = deck.slice(1);
-    drewCard = true;
+  if (state.turnPhase !== "discard" && state.deck.length > 0) {
+    throw new Error("Draw a card before discarding.");
   }
 
+  let hand = seat === "host" ? [...state.hostHand] : [...state.guestHand];
   const discardCard = hand.find((card) => card.id === discardCardId);
   if (!discardCard) {
     throw new Error("Choose a valid card to place into the open area.");
@@ -201,16 +271,33 @@ function applyDrawAndDiscard(
   hand = hand.filter((card) => card.id !== discardCardId);
   const openCards = [...state.openCards, discardCard];
 
-  const nextState =
+  const nextState: FourteenPointsState =
     seat === "host"
-      ? { ...state, deck, hostHand: hand, openCards, activeSeat: otherSeat(seat) }
-      : { ...state, deck, guestHand: hand, openCards, activeSeat: otherSeat(seat) };
+      ? {
+          ...state,
+          hostHand: hand,
+          openCards,
+          activeSeat: otherSeat(seat),
+          turnPhase: "action",
+          discardSource: null,
+        }
+      : {
+          ...state,
+          guestHand: hand,
+          openCards,
+          activeSeat: otherSeat(seat),
+          turnPhase: "action",
+          discardSource: null,
+        };
 
   return {
     ...updateScores(nextState),
-    lastAction: drewCard
-      ? `${seat} drew and placed ${discardCard.shortLabel} into the open.`
-      : `${seat} placed ${discardCard.shortLabel} into the open.`,
+    lastAction:
+      state.discardSource === "capture"
+        ? `${seat} placed ${discardCard.shortLabel} into the open after the capture draw.`
+        : state.turnPhase === "discard"
+          ? `${seat} placed ${discardCard.shortLabel} into the open after drawing.`
+        : `${seat} placed ${discardCard.shortLabel} into the open.`,
   };
 }
 
@@ -270,8 +357,8 @@ function otherSeat(seat: "host" | "guest"): "host" | "guest" {
 }
 
 function resolveSeatRole(room: RoomState, playerId: string): SeatRole {
-  if (room.host.playerId === playerId) return "host";
-  if (room.guest.playerId === playerId) return "guest";
+  if (room.seats.host?.playerId === playerId) return "host";
+  if (room.seats.guest?.playerId === playerId) return "guest";
   return "spectator";
 }
 
