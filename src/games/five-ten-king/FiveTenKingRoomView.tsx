@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 
 import type {
   FiveTenKingCard,
@@ -19,6 +20,7 @@ type Props = {
 
 const CARD_SPRITE_PATH = "/assets/cards/svg-cards/svg-cards.svg";
 const SEAT_ORDER: FiveTenKingSeat[] = ["north", "east", "south", "west"];
+const TABLE_POSITIONS: Array<"north" | "east" | "south" | "west"> = ["north", "east", "south", "west"];
 
 function isSeat(value: SeatRole): value is FiveTenKingSeat {
   return value === "north" || value === "east" || value === "south" || value === "west";
@@ -90,6 +92,14 @@ function configLabel(config: FiveTenKingConfig): string {
   return `${config.deckCount} deck${config.deckCount === 1 ? "" : "s"} · ${config.cardsPerPlayer} cards each · target ${config.pointsToWin}`;
 }
 
+function getSeatPosition(seat: FiveTenKingSeat, joinRole: SeatRole): "north" | "east" | "south" | "west" {
+  if (!isSeat(joinRole)) return seat;
+  const seatIndex = SEAT_ORDER.indexOf(seat);
+  const joinIndex = SEAT_ORDER.indexOf(joinRole);
+  const offset = (2 - joinIndex + SEAT_ORDER.length) % SEAT_ORDER.length;
+  return TABLE_POSITIONS[(seatIndex + offset) % TABLE_POSITIONS.length];
+}
+
 export function FiveTenKingRoomView({
   game,
   joinRole,
@@ -126,6 +136,20 @@ export function FiveTenKingRoomView({
     setSelectedCardIds([]);
   }
 
+  const seatDisplays = SEAT_ORDER.map((seat) => {
+    const count = game.hands[seat].length;
+    const isYou = joinRole === seat;
+
+    return {
+      seat,
+      count,
+      isYou,
+      position: getSeatPosition(seat, joinRole),
+    };
+  });
+  const foregroundSeat = seatDisplays.find((entry) => entry.position === "south");
+  const tableSeats = seatDisplays.filter((entry) => !entry.isYou);
+
   return (
     <section className="card-room-shell">
       <div className="board-meta">
@@ -147,48 +171,102 @@ export function FiveTenKingRoomView({
         </div>
       </div>
 
-      <div className="card-table">
-        {SEAT_ORDER.map((seat) => {
-          const count = game.hands[seat].length;
-          const isYou = joinRole === seat;
-          return (
-            <section className="panel-card" key={seat}>
-              <h2>{seatLabel(seat)} Hand</h2>
-              <p>
-                {count} cards
-                {game.finishedSeats.includes(seat) ? " · out" : ""}
-                {game.currentPlay?.seat === seat ? " · current play" : ""}
-              </p>
-              <div className="card-row">
-                {isYou
-                  ? visibleHand.map((card) => (
-                      <PlayingCardFace
-                        card={card}
-                        disabled={pending || (!canAct && !canIntersect)}
-                        key={card.id}
-                        onClick={() => toggleCard(card.id)}
-                        selected={selectedCardIds.includes(card.id)}
-                      />
-                    ))
-                  : Array.from({ length: count }, (_, index) => (
-                      <PlayingCardBack index={index} key={`${seat}-back-${index}`} />
-                    ))}
+      <div className="card-table scenic-table">
+        <section className="tabletop-stage">
+          {tableSeats.map(({ seat, count, position }) => (
+            <section className={`table-seat seat-${position}`} key={seat}>
+              <div className={`seat-chip ${game.activeSeat === seat ? "active" : ""}`}>
+                <strong>{seatLabel(seat)}</strong>
+                <span>
+                  {count} cards
+                  {game.finishedSeats.includes(seat) ? " · out" : ""}
+                  {game.currentPlay?.seat === seat ? " · current play" : ""}
+                </span>
+              </div>
+              <div className={`table-hand hand-${position}`}>
+                {Array.from({ length: count }, (_, index) => (
+                  <PlayingCardBack index={index} key={`${seat}-back-${index}`} />
+                ))}
               </div>
             </section>
-          );
-        })}
+          ))}
 
-        <section className="panel-card">
-          <h2>Current Trick</h2>
-          <p>
-            {game.currentPlay
-              ? `${seatLabel(game.currentPlay.seat)} played ${game.currentPlay.combo.kind}.`
-              : "No active play. Lead any valid combination."}
-          </p>
-          <div className="card-row">
-            {game.trickPile.map((card) => (
-              <PlayingCardFace card={card} disabled key={card.id} selected={false} />
-            ))}
+          <section className="table-center panel-card">
+            <div className="table-center-head">
+              <div>
+                <h2>Current Trick</h2>
+                <p>
+                  {game.currentPlay
+                    ? `${seatLabel(game.currentPlay.seat)} played ${game.currentPlay.combo.kind}.`
+                    : "No active play. Lead any valid combination."}
+                </p>
+              </div>
+              <div className="table-deck-stack" aria-hidden="true">
+                <div className="card-back deck-card deck-card-1">
+                  <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                    <use href={`${CARD_SPRITE_PATH}#back`} />
+                  </svg>
+                </div>
+                <div className="card-back deck-card deck-card-2">
+                  <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                    <use href={`${CARD_SPRITE_PATH}#back`} />
+                  </svg>
+                </div>
+                <div className="card-back deck-card deck-card-3">
+                  <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                    <use href={`${CARD_SPRITE_PATH}#back`} />
+                  </svg>
+                </div>
+                <span>Decks dealt</span>
+              </div>
+            </div>
+            <div className="card-row trick-spread">
+              {game.trickPile.map((card) => (
+                <PlayingCardFace card={card} disabled key={card.id} selected={false} />
+              ))}
+            </div>
+          </section>
+        </section>
+
+        <section className="table-foreground panel-card">
+          <div className="table-foreground-head">
+            <div>
+              <h2>{foregroundSeat?.isYou ? "Your Hand" : `${seatLabel(foregroundSeat?.seat ?? "south")} Hand`}</h2>
+              <p>
+                {foregroundSeat?.count ?? 0} cards
+                {foregroundSeat && game.finishedSeats.includes(foregroundSeat.seat) ? " · out" : ""}
+                {foregroundSeat && game.currentPlay?.seat === foregroundSeat.seat ? " · current play" : ""}
+              </p>
+            </div>
+            {foregroundSeat?.isYou ? <span className="eyebrow">Front Row</span> : null}
+          </div>
+          <div className="fan-hand" role="list">
+            {foregroundSeat?.isYou
+              ? visibleHand.map((card, index) => (
+                  <div
+                    className="fan-card"
+                    key={card.id}
+                    role="listitem"
+                    style={{ "--card-index": index, "--card-count": visibleHand.length } as CSSProperties}
+                  >
+                    <PlayingCardFace
+                      card={card}
+                      disabled={pending || (!canAct && !canIntersect)}
+                      onClick={() => toggleCard(card.id)}
+                      selected={selectedCardIds.includes(card.id)}
+                    />
+                  </div>
+                ))
+              : Array.from({ length: foregroundSeat?.count ?? 0 }, (_, index) => (
+                  <div
+                    className="fan-card fan-card-back"
+                    key={`foreground-back-${index}`}
+                    role="listitem"
+                    style={{ "--card-index": index, "--card-count": foregroundSeat?.count ?? 0 } as CSSProperties}
+                  >
+                    <PlayingCardBack index={index} />
+                  </div>
+                ))}
           </div>
         </section>
       </div>

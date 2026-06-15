@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 
 import type { FourteenPointsState, PlayingCard } from "../../../shared/fourteen-points";
 import type { SeatRole } from "../../../shared/types";
@@ -154,140 +155,165 @@ export function FourteenPointsRoomView({
   }
 
   return (
-    <section className="card-room-shell">
-      <div className="board-meta">
-        <div className={`clock-card ${game.activeSeat === "host" ? "active" : ""}`}>
-          <span>Host score</span>
-          <strong>{game.hostScore}</strong>
-        </div>
-        <div className={`clock-card ${game.activeSeat === "guest" ? "active" : ""}`}>
-          <span>Guest score</span>
-          <strong>{game.guestScore}</strong>
-        </div>
-        <div className="stat-card">
-          <span>Status</span>
-          <strong>{statusLabel(game)}</strong>
-        </div>
-        <div className="stat-card">
-          <span>Deck</span>
-          <strong>{game.deck.length} cards</strong>
-        </div>
-      </div>
-
-      <div className="card-table">
-        <section className="panel-card">
-          <h2>Opponent Hand</h2>
-          <p>{opponentCount} cards</p>
-          <div className="card-row">
-            {Array.from({ length: opponentCount }, (_, index) => (
-              <PlayingCardBack index={index} key={`back-${index}`} />
-            ))}
+    <section className="card-room-shell compact-card-room">
+      <div className="card-table scenic-table">
+        <section className="tabletop-stage two-seat-table">
+          <div className={`turn-orbit-chip ${game.activeSeat === "host" ? "turn-north" : "turn-south"}`}>
+            Turn
           </div>
-        </section>
 
-        <section className="panel-card">
-          <h2>Open Cards</h2>
-          <p>
-            {inDiscardPhase
-              ? game.discardSource === "capture"
-                ? "You captured 14 with a full open row. Two replacement cards were drawn into your hand, and now you must place one card into the open area."
-                : "You drew a card. Now choose one hand card to place into the open area."
-              : "Select open cards to total 14 with one card from your hand."}
-          </p>
-          <div className="card-row">
-            {game.openCards.map((card) => (
-              <PlayingCardFace
-                card={card}
-                disabled={pending || !playerCanAct || inDiscardPhase}
-                key={card.id}
-                onClick={() => toggleOpenCard(card.id)}
-                selected={selectedOpenCardIds.includes(card.id)}
-              />
-            ))}
-          </div>
-        </section>
+          <section className="table-seat seat-north">
+            <div className={`seat-chip ${game.activeSeat !== joinRole && game.status === "active" ? "active" : ""}`}>
+              <strong>Opponent</strong>
+              <span>{opponentCount} cards</span>
+            </div>
+            <div className="table-hand hand-north">
+              {Array.from({ length: opponentCount }, (_, index) => (
+                <PlayingCardBack index={index} key={`back-${index}`} />
+              ))}
+            </div>
+          </section>
 
-        <section className="panel-card">
-          <h2>Your Hand</h2>
-          <p>
-            {inDiscardPhase
-              ? game.discardSource === "capture"
-                ? "Choose one card from your hand to return to the open area."
-                : "Choose one card to discard into the open area."
-              : "Choose one card to capture with, or draw first and then discard one card."}
-          </p>
-          <div className="card-row">
-            {visibleHand.map((card) => (
-              <PlayingCardFace
-                card={card}
-                disabled={pending || !playerCanAct}
-                key={card.id}
-                onClick={() => setSelectedHandCardId(card.id)}
-                selected={selectedHandCardId === card.id}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
+          <section className="table-center panel-card">
+            <div className="table-center-head">
+              <div>
+                <h2>Open Cards</h2>
+                <p>
+                  {inDiscardPhase
+                    ? game.discardSource === "capture"
+                      ? "You captured 14 with a full open row. Two replacement cards were drawn into your hand, and now place one card back into the open area."
+                      : "You drew a card. Choose one hand card to place into the open area."
+                    : "Select open cards that total 14 with one card from your hand."}
+                </p>
+              </div>
+              <button
+                aria-label={game.deck.length > 0 ? `Draw from deck, ${game.deck.length} cards remaining` : "Deck empty"}
+                className="table-deck-button"
+                disabled={!playerCanAct || pending || inDiscardPhase || game.deck.length === 0}
+                onClick={() => void onDrawCard()}
+                type="button"
+              >
+                <div className="table-deck-stack">
+                  <div className="card-back deck-card deck-card-1">
+                    <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                      <use href={`${CARD_SPRITE_PATH}#back`} />
+                    </svg>
+                  </div>
+                  <div className="card-back deck-card deck-card-2">
+                    <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                      <use href={`${CARD_SPRITE_PATH}#back`} />
+                    </svg>
+                  </div>
+                  <div className="card-back deck-card deck-card-3">
+                    <svg aria-hidden="true" viewBox="0 0 169.075 244.64">
+                      <use href={`${CARD_SPRITE_PATH}#back`} />
+                    </svg>
+                  </div>
+                  <span>{game.deck.length} in deck</span>
+                </div>
+              </button>
+            </div>
+            <div className="card-row trick-spread">
+              {game.openCards.map((card) => (
+                <PlayingCardFace
+                  card={card}
+                  disabled={pending || !playerCanAct || inDiscardPhase}
+                  key={card.id}
+                  onClick={() => toggleOpenCard(card.id)}
+                  selected={selectedOpenCardIds.includes(card.id)}
+                />
+              ))}
+            </div>
+          </section>
 
-      <section className="setup-panel">
-        <div className="card-summary-grid">
-          <article className="stat-card">
-            <span>Selected total</span>
+          <div className="table-corner-stat corner-left">
+            <span>Selected</span>
             <strong>{captureTotal}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Captured cards</span>
+          </div>
+          <div className="table-corner-stat corner-right">
+            <span>Captured</span>
             <strong>
               {game.hostCaptured.length} / {game.guestCaptured.length}
             </strong>
-          </article>
-        </div>
-        <p className="status-line">{game.lastAction ?? "Waiting for play."}</p>
-        <div className="setup-actions">
-          <button
-            disabled={
-              !playerCanAct ||
-              pending ||
-              inDiscardPhase ||
-              !selectedHandCardId ||
-              selectedOpenCardIds.length === 0
-            }
-            onClick={() => void submitCapture()}
-            type="button"
-          >
-            Capture 14
-          </button>
-          {inDiscardPhase ? (
-            <button
-              className="secondary"
-              disabled={!playerCanAct || pending || !selectedHandCardId}
-              onClick={() => void submitDiscardToOpen()}
-              type="button"
-            >
-              Discard to open
-            </button>
-          ) : game.deck.length > 0 ? (
-            <button
-              className="secondary"
-              disabled={!playerCanAct || pending}
-              onClick={() => void onDrawCard()}
-              type="button"
-            >
-              Draw
-            </button>
-          ) : (
-            <button
-              className="secondary"
-              disabled={!playerCanAct || pending || !selectedHandCardId}
-              onClick={() => void submitDiscardToOpen()}
-              type="button"
-            >
-              Discard to open
-            </button>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+
+        <section className="table-foreground panel-card">
+          <div className="table-foreground-head">
+            <div className="seat-chip player-seat-chip">
+              <strong>You</strong>
+              <span>{visibleHand.length} cards in hand</span>
+            </div>
+            <div>
+              <h2>Your Hand</h2>
+              <p>
+                {inDiscardPhase
+                  ? game.discardSource === "capture"
+                    ? "Choose one card from your hand to return to the open area."
+                    : "Choose one card to discard into the open area."
+                  : "Choose one card to capture with, or draw first and then discard one card."}
+              </p>
+            </div>
+          </div>
+          <div className="fan-hand" role="list">
+            {visibleHand.map((card, index) => (
+              <div
+                className="fan-card"
+                key={card.id}
+                role="listitem"
+                style={{ "--card-index": index, "--card-count": visibleHand.length } as CSSProperties}
+              >
+                <PlayingCardFace
+                  card={card}
+                  disabled={pending || !playerCanAct}
+                  onClick={() => setSelectedHandCardId(card.id)}
+                  selected={selectedHandCardId === card.id}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="table-foreground-footer">
+            <div className="table-action-row">
+              <button
+                disabled={
+                  !playerCanAct ||
+                  pending ||
+                  inDiscardPhase ||
+                  !selectedHandCardId ||
+                  selectedOpenCardIds.length === 0
+                }
+                onClick={() => void submitCapture()}
+                type="button"
+              >
+                Capture 14
+              </button>
+              {inDiscardPhase ? (
+                <button
+                  className="secondary"
+                  disabled={!playerCanAct || pending || !selectedHandCardId}
+                  onClick={() => void submitDiscardToOpen()}
+                  type="button"
+                >
+                  Discard to open
+                </button>
+              ) : game.deck.length === 0 ? (
+                <button
+                  className="secondary"
+                  disabled={!playerCanAct || pending || !selectedHandCardId}
+                  onClick={() => void submitDiscardToOpen()}
+                  type="button"
+                >
+                  Discard to open
+                </button>
+                ) : null}
+            </div>
+            <p className="table-status-note">
+              {game.lastAction ?? statusLabel(game)}
+              {!inDiscardPhase && game.deck.length > 0 ? " Click the deck to draw." : ""}
+            </p>
+          </div>
+        </section>
+      </div>
     </section>
   );
 }
