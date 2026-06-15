@@ -272,7 +272,7 @@ function RoomPage({
                 <label>
                   Timer
                   <select
-                    disabled={joinRole !== "host" || gameState.status === "active" || pending}
+                    disabled={joinRole !== "host" || gameState.status !== "waiting" || pending}
                     onChange={(event) => onTimerChange(Number(event.target.value) as TimerPreset)}
                     value={configTimer}
                   >
@@ -287,7 +287,7 @@ function RoomPage({
                 <label>
                   Host color
                   <select
-                    disabled={joinRole !== "host" || gameState.status === "active" || pending}
+                    disabled={joinRole !== "host" || gameState.status !== "waiting" || pending}
                     onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
                     value={configHostColor}
                   >
@@ -303,14 +303,19 @@ function RoomPage({
               <div className="setup-actions">
                 <button
                   className="secondary"
-                  disabled={joinRole !== "host" || pending}
+                  disabled={joinRole !== "host" || pending || gameState.status !== "waiting"}
                   onClick={() => void onSaveConfiguration()}
                   type="button"
                 >
                   Save settings
                 </button>
                 <button
-                  disabled={joinRole !== "host" || pending || roomState?.status !== "ready"}
+                  disabled={
+                    joinRole !== "host" ||
+                    pending ||
+                    roomState?.status !== "ready" ||
+                    gameState.status !== "waiting"
+                  }
                   onClick={() => void onStartGame()}
                   type="button"
                 >
