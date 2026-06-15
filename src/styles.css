@@ -361,6 +361,13 @@ h1 {
   gap: 1rem;
 }
 
+.pregame-stage {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  min-height: 280px;
+}
+
 .play-header-actions {
   display: flex;
   align-items: center;

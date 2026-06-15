@@ -542,14 +542,14 @@ function RoomPage({
             </div>
           ) : null}
 
-          {chessState ? (
+          {hasGameStarted && chessState ? (
             <ChessRoomView
               game={chessState}
               joinRole={joinRole}
               onAction={onMove}
               pending={pending}
             />
-          ) : fourteenPointsState ? (
+          ) : hasGameStarted && fourteenPointsState ? (
             <FourteenPointsRoomView
               game={fourteenPointsState}
               joinRole={joinRole}
@@ -557,6 +557,15 @@ function RoomPage({
               onDrawAndDiscard={onDrawAndDiscard}
               pending={pending}
             />
+          ) : roomState ? (
+            <section className="panel-card pregame-stage">
+              <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
+              <h2>Room lobby</h2>
+              <p>
+                Seats, host controls, and match settings stay on the left. The game surface will
+                appear here once the match starts.
+              </p>
+            </section>
           ) : (
             <section className="panel-card">
               <h2>Loading room</h2>
