@@ -1,7 +1,8 @@
 import type { ChessState } from "./games/chess/logic/types";
+import type { FourteenPointsState } from "./games/fourteen-points/logic/types";
 
 export type SeatRole = "host" | "guest" | "spectator";
-export type GameKey = "chess";
+export type GameKey = "chess" | "fourteen-points";
 
 export type PlayerIdentity = {
   playerId: string;
@@ -34,9 +35,27 @@ export type ChessMoveAction = {
   };
 };
 
-export type GameAction = ChessMoveAction;
+export type FourteenPointsCaptureAction = {
+  type: "capture_cards";
+  payload: {
+    handCardId: string;
+    openCardIds: string[];
+  };
+};
 
-export type AnyGameState = ChessState;
+export type FourteenPointsDrawAndDiscardAction = {
+  type: "draw_and_discard";
+  payload: {
+    discardCardId: string;
+  };
+};
+
+export type GameAction =
+  | ChessMoveAction
+  | FourteenPointsCaptureAction
+  | FourteenPointsDrawAndDiscardAction;
+
+export type AnyGameState = ChessState | FourteenPointsState;
 
 export type RoomPayload = {
   room: RoomSnapshot;

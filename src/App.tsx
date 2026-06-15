@@ -1,11 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { ChessRoomView } from "./games/chess/ChessRoomView";
+import { FourteenPointsRoomView } from "./games/fourteen-points/FourteenPointsRoomView";
 import { getOrCreatePlayerIdentity } from "./lib/player";
 import { getRoomIdFromPath } from "./lib/routes";
 import { GAME_CATALOG, getGameCatalogEntry } from "../shared/games";
 import type { ChessState, HostColorChoice, TimerPreset } from "../shared/chess";
+import type { FourteenPointsState } from "../shared/fourteen-points";
 import type {
+  AnyGameState,
   CreateRoomResponse,
   GameAction,
   GameKey,
@@ -190,10 +193,12 @@ function RoomPage({
   onStartGame,
   onCopyInvite,
   onMove,
+  onCapture,
+  onDrawAndDiscard,
 }: {
   roomId: string;
   roomState: RoomSnapshot | null;
-  gameState: ChessState | null;
+  gameState: AnyGameState | null;
   joinRole: SeatRole;
   playerName: string;
   pending: boolean;
@@ -208,8 +213,13 @@ function RoomPage({
   onStartGame: () => Promise<void>;
   onCopyInvite: () => Promise<void>;
   onMove: (from: string, to: string) => Promise<void>;
+  onCapture: (handCardId: string, openCardIds: string[]) => Promise<void>;
+  onDrawAndDiscard: (discardCardId: string) => Promise<void>;
 }) {
   const gameMeta = roomState ? getGameCatalogEntry(roomState.gameKey) : null;
+  const chessState = gameState?.key === "chess" ? (gameState as ChessState) : null;
+  const fourteenPointsState =
+    gameState?.key === "fourteen-points" ? (gameState as FourteenPointsState) : null;
 
   return (
     <main className="app-shell room-shell">
@@ -217,9 +227,7 @@ function RoomPage({
         <div className="room-copy">
           <span className="eyebrow">{gameMeta?.accent ?? "Room"}</span>
           <h1>{roomId}</h1>
-          <p className="lede">
-            {gameMeta?.summary ?? "Loading room metadata."}
-          </p>
+          <p className="lede">{gameMeta?.summary ?? "Loading room metadata."}</p>
 
           <div className="stats-grid">
             <article className="stat-card">
@@ -245,14 +253,14 @@ function RoomPage({
               <span>Host</span>
               <strong>
                 {roomState?.host.displayName ?? "Open seat"}
-                {gameState ? ` · ${gameState.hostColor}` : ""}
+                {chessState ? ` · ${chessState.hostColor}` : ""}
               </strong>
             </article>
             <article className="seat-card">
               <span>Guest</span>
               <strong>
                 {roomState?.guest.displayName ?? "Open seat"}
-                {gameState ? ` · ${gameState.guestColor}` : ""}
+                {chessState ? ` · ${chessState.guestColor}` : ""}
               </strong>
             </article>
           </div>
@@ -266,13 +274,13 @@ function RoomPage({
             </button>
           </div>
 
-          {gameState ? (
+          {chessState ? (
             <div className="setup-panel">
               <div className="setup-row">
                 <label>
                   Timer
                   <select
-                    disabled={joinRole !== "host" || gameState.status !== "waiting" || pending}
+                    disabled={joinRole !== "host" || chessState.status !== "waiting" || pending}
                     onChange={(event) => onTimerChange(Number(event.target.value) as TimerPreset)}
                     value={configTimer}
                   >
@@ -287,7 +295,7 @@ function RoomPage({
                 <label>
                   Host color
                   <select
-                    disabled={joinRole !== "host" || gameState.status !== "waiting" || pending}
+                    disabled={joinRole !== "host" || chessState.status !== "waiting" || pending}
                     onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
                     value={configHostColor}
                   >
@@ -303,7 +311,7 @@ function RoomPage({
               <div className="setup-actions">
                 <button
                   className="secondary"
-                  disabled={joinRole !== "host" || pending || gameState.status !== "waiting"}
+                  disabled={joinRole !== "host" || pending || chessState.status !== "waiting"}
                   onClick={() => void onSaveConfiguration()}
                   type="button"
                 >
@@ -314,7 +322,7 @@ function RoomPage({
                     joinRole !== "host" ||
                     pending ||
                     roomState?.status !== "ready" ||
-                    gameState.status !== "waiting"
+                    chessState.status !== "waiting"
                   }
                   onClick={() => void onStartGame()}
                   type="button"
@@ -323,18 +331,41 @@ function RoomPage({
                 </button>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="setup-panel">
+              <p className="status-line">
+                Both seats must be filled before the host starts the game.
+              </p>
+              <div className="setup-actions">
+                <button
+                  disabled={joinRole !== "host" || pending || roomState?.status !== "ready"}
+                  onClick={() => void onStartGame()}
+                  type="button"
+                >
+                  Start match
+                </button>
+              </div>
+            </div>
+          )}
 
           {message ? <p className="status-line">{message}</p> : null}
           {error ? <p className="error-line">{error}</p> : null}
         </div>
 
         <div className="room-stage">
-          {gameState ? (
+          {chessState ? (
             <ChessRoomView
-              game={gameState}
+              game={chessState}
               joinRole={joinRole}
               onAction={onMove}
+              pending={pending}
+            />
+          ) : fourteenPointsState ? (
+            <FourteenPointsRoomView
+              game={fourteenPointsState}
+              joinRole={joinRole}
+              onCapture={onCapture}
+              onDrawAndDiscard={onDrawAndDiscard}
               pending={pending}
             />
           ) : (
@@ -355,7 +386,7 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState<GameKey>("chess");
   const [joinCode, setJoinCode] = useState("");
   const [roomState, setRoomState] = useState<RoomSnapshot | null>(null);
-  const [gameState, setGameState] = useState<ChessState | null>(null);
+  const [gameState, setGameState] = useState<AnyGameState | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -366,7 +397,7 @@ export default function App() {
   const joinRole = getSeatRole(roomState, player.playerId);
 
   useEffect(() => {
-    if (!gameState) return;
+    if (!gameState || gameState.key !== "chess") return;
     setConfigTimer(gameState.timerMs);
     setConfigHostColor(gameState.hostColor);
   }, [gameState]);
@@ -392,7 +423,7 @@ export default function App() {
         const payload = (await response.json()) as RoomPayload;
         if (!active) return;
         setRoomState(payload.room);
-        setGameState(payload.game as ChessState);
+        setGameState(payload.game as AnyGameState);
         setSelectedGame(payload.room.gameKey);
         setError(null);
       } catch (caught) {
@@ -414,7 +445,7 @@ export default function App() {
           const payload = JSON.parse(event.data) as RoomSocketMessage;
           if (payload.type === "room_state") {
             setRoomState(payload.room);
-            setGameState(payload.game as ChessState);
+            setGameState(payload.game as AnyGameState);
             setSelectedGame(payload.room.gameKey);
             setError(null);
           } else if (payload.type === "error") {
@@ -521,7 +552,7 @@ export default function App() {
       }
 
       setRoomState(payload.room);
-      setGameState(payload.game as ChessState);
+      setGameState(payload.game as AnyGameState);
       setMessage(
         payload.role === "spectator"
           ? "Room is already full. You joined as a spectator."
@@ -561,7 +592,7 @@ export default function App() {
       }
 
       setRoomState(payload.room);
-      setGameState(payload.game as ChessState);
+      setGameState(payload.game as AnyGameState);
       setMessage("Room settings updated.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save settings.");
@@ -592,7 +623,7 @@ export default function App() {
       }
 
       setRoomState(payload.room);
-      setGameState(payload.game as ChessState);
+      setGameState(payload.game as AnyGameState);
       setMessage("Match started.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not start match.");
@@ -625,7 +656,7 @@ export default function App() {
       }
 
       setRoomState(payload.room);
-      setGameState(payload.game as ChessState);
+      setGameState(payload.game as AnyGameState);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Action failed.");
     } finally {
@@ -636,6 +667,20 @@ export default function App() {
   async function copyInvite() {
     await navigator.clipboard.writeText(window.location.href);
     setMessage("Invite link copied.");
+  }
+
+  async function captureFourteenPoints(handCardId: string, openCardIds: string[]) {
+    await sendAction({
+      type: "capture_cards",
+      payload: { handCardId, openCardIds },
+    });
+  }
+
+  async function drawAndDiscardFourteenPoints(discardCardId: string) {
+    await sendAction({
+      type: "draw_and_discard",
+      payload: { discardCardId },
+    });
   }
 
   if (!roomId) {
@@ -666,8 +711,10 @@ export default function App() {
       gameState={gameState}
       joinRole={joinRole}
       message={message}
+      onCapture={captureFourteenPoints}
       onClaimSeat={claimSeat}
       onCopyInvite={copyInvite}
+      onDrawAndDiscard={drawAndDiscardFourteenPoints}
       onMove={(from, to) => sendAction({ type: "move", payload: { from, to } })}
       onHostColorChange={setConfigHostColor}
       onSaveConfiguration={saveConfiguration}
