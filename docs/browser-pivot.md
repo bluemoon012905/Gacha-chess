@@ -135,7 +135,8 @@ Planned games to add later:
 - Guessing Chess
 - Rule set will be provided later by you and is waiting on upload
 - Find 14
-- 5-10-King
+- Jinzhou 510K
+- Documented in `docs/jinzhou-510k.md`; implementation spec still needed before coding
 - Fight the Landlord
 
 ## Relationship To Existing Design Docs
