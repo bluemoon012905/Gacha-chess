@@ -1,8 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 
-import { generateDisplayName } from "../shared/player";
+import { resolveDisplayName } from "../shared/player";
 import {
   applyGameAction,
+  chooseFourteenPointsAiAction,
   createGameState,
   GAME_CATALOG,
   getSeatOrderForGame,
@@ -37,6 +38,9 @@ type StoredRoom = {
   room: RoomState;
   game: AnyGameState;
 };
+
+const FOURTEEN_POINTS_AI_PLAYER_ID = "ai-fourteen-points-guest";
+const FOURTEEN_POINTS_AI_NAME = "Table AI";
 
 function json(data: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(data, null, 2), {
@@ -86,7 +90,7 @@ function ensurePlayerIdentity(headers: Headers): PlayerIdentity {
 
   return {
     playerId,
-    displayName: headers.get("x-player-name")?.trim() || generateDisplayName(),
+    displayName: resolveDisplayName(headers.get("x-player-name")),
   };
 }
 
@@ -114,6 +118,10 @@ function upsertMember(
   }
 
   return members.map((existing, index) => (index === existingIndex ? member : existing));
+}
+
+function removeMember(members: RoomMember[], playerId: string): RoomMember[] {
+  return members.filter((member) => member.playerId !== playerId);
 }
 
 function gameHasStarted(game: AnyGameState): boolean {
@@ -345,6 +353,12 @@ export class GameRoom extends DurableObject<Env> {
       case "transfer_room_host":
         this.transferRoomHost(stored.room, action.payload.memberId);
         break;
+      case "add_fourteen_points_ai":
+        this.addFourteenPointsAi(stored.room);
+        break;
+      case "remove_fourteen_points_ai":
+        this.removeFourteenPointsAi(stored.room);
+        break;
       default:
         throw new Error("Unsupported lobby action.");
     }
@@ -387,8 +401,9 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     stored.game = startGameState(stored.room.gameKey, stored.game, new Date().toISOString());
-    await this.ctx.storage.put("state", stored);
-    const payload = this.toPayload(stored);
+    const automated = this.resolveAutomatedTurns(stored);
+    await this.ctx.storage.put("state", automated);
+    const payload = this.toPayload(automated);
     this.broadcastRoomState(payload);
     return payload;
   }
@@ -403,9 +418,10 @@ export class GameRoom extends DurableObject<Env> {
       player,
       action,
     );
+    const automated = this.resolveAutomatedTurns(refreshed);
 
-    await this.ctx.storage.put("state", refreshed);
-    const payload = this.toPayload(refreshed);
+    await this.ctx.storage.put("state", automated);
+    const payload = this.toPayload(automated);
     this.broadcastRoomState(payload);
     return payload;
   }
@@ -441,78 +457,167 @@ export class GameRoom extends DurableObject<Env> {
 
   private withFreshGame(stored: StoredRoom): StoredRoom {
     const refreshedGame = refreshGameState(stored.room.gameKey, stored.game, new Date().toISOString());
-    if (refreshedGame === stored.game) {
+    const refreshed =
+      refreshedGame === stored.game
+        ? stored
+        : {
+            room: stored.room,
+            game: refreshedGame,
+          };
+
+    return this.resolveAutomatedTurns(refreshed);
+  }
+
+  private resolveAutomatedTurns(stored: StoredRoom): StoredRoom {
+    if (stored.room.gameKey !== "fourteen-points") {
       return stored;
     }
 
-    return {
-      room: stored.room,
-      game: refreshedGame,
+    let current = stored;
+    let safety = 0;
+    while (this.isFourteenPointsAiTurn(current) && safety < 32) {
+      current = {
+        room: current.room,
+        game: applyGameAction(
+          current.room.gameKey,
+          current.game,
+          current.room,
+          {
+            playerId: FOURTEEN_POINTS_AI_PLAYER_ID,
+            displayName: FOURTEEN_POINTS_AI_NAME,
+          },
+          chooseFourteenPointsAiAction(current.game as Extract<AnyGameState, { key: "fourteen-points" }>, "guest"),
+        ),
+      };
+      safety += 1;
+    }
+
+    return current;
+  }
+
+  private isFourteenPointsAiTurn(stored: StoredRoom): boolean {
+    if (stored.room.gameKey !== "fourteen-points" || stored.game.key !== "fourteen-points") {
+      return false;
+    }
+
+    return (
+      stored.game.status === "active" &&
+      stored.game.activeSeat === "guest" &&
+      stored.room.seats.guest?.playerId === FOURTEEN_POINTS_AI_PLAYER_ID
+    );
+  }
+
+  private addFourteenPointsAi(room: RoomState): void {
+    if (room.gameKey !== "fourteen-points") {
+      throw new Error("AI seating is only available for 14 Points right now.");
+    }
+
+    const guestSeat = room.seats.guest;
+    if (guestSeat?.playerId && guestSeat.playerId !== FOURTEEN_POINTS_AI_PLAYER_ID) {
+      throw new Error("Seat B is already taken by a human player.");
+    }
+
+    room.members = upsertMember(
+      room.members,
+      {
+        playerId: FOURTEEN_POINTS_AI_PLAYER_ID,
+        displayName: FOURTEEN_POINTS_AI_NAME,
+      },
+      new Date().toISOString(),
+    );
+    room.seats.guest = {
+      playerId: FOURTEEN_POINTS_AI_PLAYER_ID,
+      displayName: FOURTEEN_POINTS_AI_NAME,
     };
   }
 
-  private normalizeStoredRoom(stored: StoredRoom): StoredRoom {
-    return {
-      room: {
-        ...stored.room,
-        roomHostPlayerId:
-          stored.room.roomHostPlayerId ??
-          stored.room.seats?.host?.playerId ??
-          stored.room.seats?.north?.playerId ??
-          null,
-        seatOrder:
-          stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey),
-        seats: (() => {
-          const seatOrder =
-            stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
-          const baseSeats = createSeatMap(seatOrder);
-          const normalizedSeats = stored.room.seats ?? {};
-          for (const seat of seatOrder) {
-            baseSeats[seat] =
-              normalizedSeats[seat] ??
-              (seat === "host" && "host" in stored.room
-                ? (stored.room as RoomState & { host?: RoomSeat }).host
-                : seat === "guest" && "guest" in stored.room
-                  ? (stored.room as RoomState & { guest?: RoomSeat }).guest
-                  : undefined) ?? { playerId: null, displayName: null };
-          }
-          return baseSeats;
-        })(),
-        members:
-          stored.room.members?.length
-            ? stored.room.members
-            : (() => {
-                const seatOrder =
-                  stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
-                const baseSeats = createSeatMap(seatOrder);
-                const normalizedSeats = stored.room.seats ?? {};
-                for (const seat of seatOrder) {
-                  baseSeats[seat] =
-                    normalizedSeats[seat] ??
-                    (seat === "host" && "host" in stored.room
-                      ? (stored.room as RoomState & { host?: RoomSeat }).host
-                      : seat === "guest" && "guest" in stored.room
-                        ? (stored.room as RoomState & { guest?: RoomSeat }).guest
-                        : undefined) ?? { playerId: null, displayName: null };
-                }
+  private removeFourteenPointsAi(room: RoomState): void {
+    if (room.gameKey !== "fourteen-points") {
+      throw new Error("AI seating is only available for 14 Points right now.");
+    }
 
-                return Object.values(baseSeats)
-                  .filter((seat): seat is RoomSeat => Boolean(seat?.playerId))
-                  .map((seat) => ({
-                    playerId: seat.playerId as string,
-                    displayName: seat.displayName ?? "Player",
-                    joinedAt: stored.room.createdAt,
-                  }));
-              })(),
-      },
-      game: normalizeGameState(stored.room.gameKey, stored.game),
-    };
+    if (room.seats.guest?.playerId === FOURTEEN_POINTS_AI_PLAYER_ID) {
+      room.seats.guest = { playerId: null, displayName: null };
+    }
+    room.members = removeMember(room.members, FOURTEEN_POINTS_AI_PLAYER_ID);
+  }
+
+  private maybeRemoveFourteenPointsAiFromRoom(room: RoomState): void {
+    if (room.gameKey !== "fourteen-points") {
+      return;
+    }
+
+    if (room.seats.guest?.playerId !== FOURTEEN_POINTS_AI_PLAYER_ID) {
+      room.members = removeMember(room.members, FOURTEEN_POINTS_AI_PLAYER_ID);
+    }
   }
 
   private toPayload(stored: StoredRoom): RoomPayload {
     return {
       room: roomSnapshotFromState(stored.room),
       game: stored.game,
+    };
+  }
+
+  private normalizeStoredRoom(stored: StoredRoom): StoredRoom {
+    const normalizedRoom: RoomState = {
+      ...stored.room,
+      roomHostPlayerId:
+        stored.room.roomHostPlayerId ??
+        stored.room.seats?.host?.playerId ??
+        stored.room.seats?.north?.playerId ??
+        null,
+      seatOrder:
+        stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey),
+      seats: (() => {
+        const seatOrder =
+          stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
+        const baseSeats = createSeatMap(seatOrder);
+        const normalizedSeats = stored.room.seats ?? {};
+        for (const seat of seatOrder) {
+          baseSeats[seat] =
+            normalizedSeats[seat] ??
+            (seat === "host" && "host" in stored.room
+              ? (stored.room as RoomState & { host?: RoomSeat }).host
+              : seat === "guest" && "guest" in stored.room
+                ? (stored.room as RoomState & { guest?: RoomSeat }).guest
+                : undefined) ?? { playerId: null, displayName: null };
+        }
+        return baseSeats;
+      })(),
+      members:
+        stored.room.members?.length
+          ? stored.room.members
+          : (() => {
+              const seatOrder =
+                stored.room.seatOrder?.length ? stored.room.seatOrder : getSeatOrderForGame(stored.room.gameKey);
+              const baseSeats = createSeatMap(seatOrder);
+              const normalizedSeats = stored.room.seats ?? {};
+              for (const seat of seatOrder) {
+                baseSeats[seat] =
+                  normalizedSeats[seat] ??
+                  (seat === "host" && "host" in stored.room
+                    ? (stored.room as RoomState & { host?: RoomSeat }).host
+                    : seat === "guest" && "guest" in stored.room
+                      ? (stored.room as RoomState & { guest?: RoomSeat }).guest
+                      : undefined) ?? { playerId: null, displayName: null };
+              }
+
+              return Object.values(baseSeats)
+                .filter((seat): seat is RoomSeat => Boolean(seat?.playerId))
+                .map((seat) => ({
+                  playerId: seat.playerId as string,
+                  displayName: seat.displayName ?? "Player",
+                  joinedAt: stored.room.createdAt,
+                }));
+            })(),
+    };
+
+    this.maybeRemoveFourteenPointsAiFromRoom(normalizedRoom);
+
+    return {
+      room: normalizedRoom,
+      game: normalizeGameState(stored.room.gameKey, stored.game),
     };
   }
 
@@ -541,6 +646,7 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
     room.seats[seat] = { playerId: member.playerId, displayName: member.displayName };
+    this.maybeRemoveFourteenPointsAiFromRoom(room);
   }
 
   private clearSeat(room: RoomState, seat: PlayableSeatRole): void {
@@ -549,9 +655,14 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     room.seats[seat] = { playerId: null, displayName: null };
+    this.maybeRemoveFourteenPointsAiFromRoom(room);
   }
 
   private transferRoomHost(room: RoomState, memberId: string): void {
+    if (memberId === FOURTEEN_POINTS_AI_PLAYER_ID) {
+      throw new Error("The AI cannot become the room host.");
+    }
+
     const member = room.members.find((entry) => entry.playerId === memberId);
     if (!member) {
       throw new Error("Selected member is not in the room.");

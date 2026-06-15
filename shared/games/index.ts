@@ -12,6 +12,7 @@ import type { FiveTenKingState } from "./five-ten-king/logic/types";
 import type { ChessState } from "./chess/logic/types";
 import {
   applyFourteenPointsAction,
+  chooseFourteenPointsAiAction,
   FOURTEEN_POINTS_GAME_META,
   createFourteenPointsGameState,
   normalizeFourteenPointsState,
@@ -125,3 +126,5 @@ export function normalizeGameState(gameKey: GameKey, state: AnyGameState): AnyGa
 export function getSeatOrderForGame(gameKey: GameKey): PlayableSeatRole[] {
   return getGameCatalogEntry(gameKey).seatOrder;
 }
+
+export { chooseFourteenPointsAiAction };

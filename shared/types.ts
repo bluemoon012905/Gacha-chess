@@ -102,6 +102,12 @@ export type LobbyAction =
       payload: {
         memberId: string;
       };
+    }
+  | {
+      type: "add_fourteen_points_ai";
+    }
+  | {
+      type: "remove_fourteen_points_ai";
     };
 
 export type GameAction =

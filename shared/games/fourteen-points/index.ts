@@ -131,6 +131,37 @@ export function normalizeFourteenPointsState(state: FourteenPointsState): Fourte
   };
 }
 
+export function chooseFourteenPointsAiAction(
+  state: FourteenPointsState,
+  seat: "host" | "guest",
+): Extract<GameAction, { type: "capture_cards" | "draw_card" | "discard_to_open" }> {
+  const hand = seat === "host" ? state.hostHand : state.guestHand;
+
+  if (state.turnPhase === "discard" || state.deck.length === 0) {
+    const discard = chooseDiscardCard(hand);
+    if (!discard) {
+      throw new Error("AI could not find a card to discard.");
+    }
+
+    return {
+      type: "discard_to_open",
+      payload: {
+        discardCardId: discard.id,
+      },
+    };
+  }
+
+  const capture = findBestCapture(hand, state.openCards);
+  if (capture) {
+    return {
+      type: "capture_cards",
+      payload: capture,
+    };
+  }
+
+  return { type: "draw_card" };
+}
+
 export function scoreCards(cards: PlayingCard[]): number {
   return cards.reduce((total, card) => total + card.score, 0);
 }
@@ -441,4 +472,85 @@ function randomInt(maxExclusive: number): number {
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
   return values[0] % maxExclusive;
+}
+
+function chooseDiscardCard(hand: PlayingCard[]): PlayingCard | null {
+  if (hand.length === 0) {
+    return null;
+  }
+
+  return [...hand].sort(compareCardsAscending)[0] ?? null;
+}
+
+function findBestCapture(
+  hand: PlayingCard[],
+  openCards: PlayingCard[],
+): { handCardId: string; openCardIds: string[] } | null {
+  let best:
+    | {
+        handCardId: string;
+        openCardIds: string[];
+        handValue: number;
+        openScore: number;
+        openValue: number;
+      }
+    | null = null;
+
+  const subsetCount = 1 << openCards.length;
+  for (const handCard of hand) {
+    for (let mask = 1; mask < subsetCount; mask += 1) {
+      const selection: PlayingCard[] = [];
+      let total = handCard.value;
+      for (let index = 0; index < openCards.length; index += 1) {
+        if ((mask & (1 << index)) === 0) continue;
+        const openCard = openCards[index];
+        selection.push(openCard);
+        total += openCard.value;
+      }
+
+      if (total !== 14) continue;
+
+      const candidate = {
+        handCardId: handCard.id,
+        openCardIds: selection.map((card) => card.id),
+        handValue: handCard.value,
+        openScore: selection.reduce((sum, card) => sum + card.score, 0),
+        openValue: selection.reduce((sum, card) => sum + card.value, 0),
+      };
+
+      if (
+        !best ||
+        candidate.handValue > best.handValue ||
+        (candidate.handValue === best.handValue && candidate.openScore > best.openScore) ||
+        (candidate.handValue === best.handValue &&
+          candidate.openScore === best.openScore &&
+          candidate.openValue > best.openValue) ||
+        (candidate.handValue === best.handValue &&
+          candidate.openScore === best.openScore &&
+          candidate.openValue === best.openValue &&
+          candidate.openCardIds.length < best.openCardIds.length)
+      ) {
+        best = candidate;
+      }
+    }
+  }
+
+  return best
+    ? {
+        handCardId: best.handCardId,
+        openCardIds: best.openCardIds,
+      }
+    : null;
+}
+
+function compareCardsAscending(left: PlayingCard, right: PlayingCard): number {
+  if (left.value !== right.value) {
+    return left.value - right.value;
+  }
+
+  if (left.score !== right.score) {
+    return left.score - right.score;
+  }
+
+  return left.id.localeCompare(right.id);
 }

@@ -11,7 +11,7 @@ The current playable path is still standard chess, but the room system, frontend
 - room lifecycle logic is shared across games
 - game-specific logic lives under `shared/games/<game>/`
 - chess state definitions and chess behavior rules are stored separately
-- players get a generated persistent display name stored in browser local storage
+- players get a generated persistent display name stored in a browser cookie
 - rooms display host and guest by generated name
 
 ## Current Flow

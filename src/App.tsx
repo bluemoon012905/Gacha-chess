@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ChessRoomView } from "./games/chess/ChessRoomView";
 import { FiveTenKingRoomView } from "./games/five-ten-king/FiveTenKingRoomView";
 import { FourteenPointsRoomView } from "./games/fourteen-points/FourteenPointsRoomView";
-import { getOrCreatePlayerIdentity } from "./lib/player";
+import { getOrCreatePlayerIdentity, updatePlayerDisplayName } from "./lib/player";
 import { getRoomIdFromPath } from "./lib/routes";
 import { GAME_CATALOG, getGameCatalogEntry } from "../shared/games";
 import type { ChessState, HostColorChoice, TimerPreset } from "../shared/chess";
@@ -45,6 +45,8 @@ const FIVE_TEN_KING_SEAT_OPTIONS: Array<{ value: PlayableSeatRole; label: string
   { value: "south", label: "South" },
   { value: "west", label: "West" },
 ];
+
+const FOURTEEN_POINTS_AI_PLAYER_ID = "ai-fourteen-points-guest";
 
 function getSeatRole(room: RoomSnapshot | null, playerId: string): SeatRole {
   if (!room) return "spectator";
@@ -91,6 +93,10 @@ function isRoomMember(room: RoomSnapshot | null, playerId: string): boolean {
   return room?.members.some((member) => member.playerId === playerId) ?? false;
 }
 
+function isFourteenPointsAiMember(playerId: string): boolean {
+  return playerId === FOURTEEN_POINTS_AI_PLAYER_ID;
+}
+
 function HomePage({
   gameKey,
   joinCode,
@@ -104,7 +110,10 @@ function HomePage({
   createFiveTenKingCardsPerPlayer,
   createFiveTenKingDoubleJokerOverQuad,
   createFiveTenKingIntersectEnabled,
+  playerName,
   onGameSelect,
+  onPlayerNameChange,
+  onSavePlayerName,
   onJoinCodeChange,
   onCreateTimerChange,
   onCreateHostColorChange,
@@ -128,7 +137,10 @@ function HomePage({
   createFiveTenKingCardsPerPlayer: number;
   createFiveTenKingDoubleJokerOverQuad: boolean;
   createFiveTenKingIntersectEnabled: boolean;
+  playerName: string;
   onGameSelect: (value: GameKey) => void;
+  onPlayerNameChange: (value: string) => void;
+  onSavePlayerName: () => void;
   onJoinCodeChange: (value: string) => void;
   onCreateTimerChange: (value: TimerPreset) => void;
   onCreateHostColorChange: (value: HostColorChoice) => void;
@@ -160,6 +172,34 @@ function HomePage({
           <p>
             Choose a game first. Then either open a fresh room or step into one with a code.
           </p>
+        </section>
+
+        <section className="panel-card identity-card">
+          <div className="section-heading">
+            <span className="panel-index">00</span>
+            <div>
+              <h2>Your player name</h2>
+              <p>
+                A name is generated when you open the site. You can edit it here and it will be
+                saved in a browser cookie.
+              </p>
+            </div>
+          </div>
+          <div className="join-form">
+            <label htmlFor="player-name">Display name</label>
+            <div className="join-input-row">
+              <input
+                id="player-name"
+                maxLength={32}
+                onChange={(event) => onPlayerNameChange(event.target.value)}
+                placeholder="Choose a display name"
+                value={playerName}
+              />
+              <button onClick={onSavePlayerName} type="button">
+                Save name
+              </button>
+            </div>
+          </div>
         </section>
 
         <div className="game-grid">
@@ -500,6 +540,8 @@ function RoomPage({
                       <span>
                         {member.playerId === roomState.roomHostPlayerId
                           ? "Room host"
+                          : isFourteenPointsAiMember(member.playerId)
+                            ? "AI player"
                           : roomState.seatOrder.find((seat) => roomState.seats[seat]?.playerId === member.playerId)
                             ? getSeatLabel(
                                 roomState.seatOrder.find(
@@ -528,7 +570,11 @@ function RoomPage({
                           ))}
                           <button
                             className="secondary"
-                            disabled={pending || member.playerId === roomState.roomHostPlayerId}
+                            disabled={
+                              pending ||
+                              member.playerId === roomState.roomHostPlayerId ||
+                              isFourteenPointsAiMember(member.playerId)
+                            }
                             onClick={() =>
                               void onLobbyAction({
                                 type: "transfer_room_host",
@@ -730,6 +776,60 @@ function RoomPage({
                   </button>
                 </div>
               </div>
+            ) : fourteenPointsState ? (
+              <div className="setup-panel">
+                <div className="section-heading">
+                  <span className="panel-index">Setup</span>
+                  <div>
+                    <h2>Table setup</h2>
+                    <p>Only the room host can edit these before the game starts.</p>
+                  </div>
+                </div>
+                <p className="status-line">
+                  Add a guest AI before the match if you want to start with a bot in Seat B.
+                </p>
+                <div className="setup-actions">
+                  <button
+                    className="secondary"
+                    disabled={
+                      !isRoomHost ||
+                      pending ||
+                      fourteenPointsState.status !== "waiting" ||
+                      (roomState?.seats.guest?.playerId != null &&
+                        roomState.seats.guest.playerId !== FOURTEEN_POINTS_AI_PLAYER_ID)
+                    }
+                    onClick={() => void onLobbyAction({ type: "add_fourteen_points_ai" })}
+                    type="button"
+                  >
+                    Add AI Player
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={
+                      !isRoomHost ||
+                      pending ||
+                      fourteenPointsState.status !== "waiting" ||
+                      roomState?.seats.guest?.playerId !== FOURTEEN_POINTS_AI_PLAYER_ID
+                    }
+                    onClick={() => void onLobbyAction({ type: "remove_fourteen_points_ai" })}
+                    type="button"
+                  >
+                    Remove AI Player
+                  </button>
+                  <button
+                    disabled={
+                      !isRoomHost ||
+                      pending ||
+                      roomState?.status !== "ready" ||
+                      fourteenPointsState.status !== "waiting"
+                    }
+                    onClick={() => void onStartGame()}
+                    type="button"
+                  >
+                    Start match
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="setup-panel">
                 <p className="status-line">
@@ -812,7 +912,9 @@ function RoomPage({
 
 export default function App() {
   const roomId = useMemo(() => getRoomIdFromPath(window.location.pathname), []);
-  const player = useMemo(() => getOrCreatePlayerIdentity(), []);
+  const initialPlayerIdentity = useMemo(() => getOrCreatePlayerIdentity(), []);
+  const [player, setPlayer] = useState(initialPlayerIdentity);
+  const [playerNameInput, setPlayerNameInput] = useState(initialPlayerIdentity.displayName);
   const [selectedGame, setSelectedGame] = useState<GameKey>("chess");
   const [joinCode, setJoinCode] = useState("");
   const [roomState, setRoomState] = useState<RoomSnapshot | null>(null);
@@ -838,6 +940,29 @@ export default function App() {
   const joinRole = getSeatRole(roomState, player.playerId);
   const isMember = isRoomMember(roomState, player.playerId);
   const isRoomHost = roomState?.roomHostPlayerId === player.playerId;
+
+  function savePlayerName() {
+    const result = updatePlayerDisplayName(player, playerNameInput);
+    setPlayer(result.identity);
+    setPlayerNameInput(result.identity.displayName);
+    setError(null);
+    if (result.generatedFallback) {
+      setMessage("Name was empty after cleanup, so a fresh one was generated.");
+      return;
+    }
+    if (result.sanitized) {
+      setMessage("Name saved with basic filtering.");
+      return;
+    }
+    setMessage("Name saved.");
+  }
+
+  function persistPlayerNameDraft() {
+    const result = updatePlayerDisplayName(player, playerNameInput);
+    setPlayer(result.identity);
+    setPlayerNameInput(result.identity.displayName);
+    return result.identity;
+  }
 
   useEffect(() => {
     if (!gameState || gameState.key !== "chess") return;
@@ -954,6 +1079,7 @@ export default function App() {
   }, [roomId]);
 
   async function createRoom() {
+    persistPlayerNameDraft();
     setPending(true);
     setError(null);
     setMessage(null);
@@ -999,6 +1125,7 @@ export default function App() {
 
   function joinRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    persistPlayerNameDraft();
     setError(null);
     setMessage(null);
 
@@ -1245,6 +1372,7 @@ export default function App() {
         gameKey={selectedGame}
         joinCode={joinCode}
         message={message}
+        playerName={playerNameInput}
         createHostColor={createHostColor}
         createTimer={createTimer}
         onCreateRoom={createRoom}
@@ -1256,6 +1384,8 @@ export default function App() {
         onCreateHostColorChange={setCreateHostColor}
         onCreateTimerChange={setCreateTimer}
         onGameSelect={setSelectedGame}
+        onPlayerNameChange={setPlayerNameInput}
+        onSavePlayerName={savePlayerName}
         onJoinCodeChange={setJoinCode}
         onJoinRoom={joinRoom}
         pending={pending}

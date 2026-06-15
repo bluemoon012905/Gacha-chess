@@ -103,7 +103,7 @@ Game-specific modules own:
 5. Create a room or open an existing room code.
 6. Join from a second tab or browser session and verify the generated names and room updates.
 
-The browser client stores a persistent player identity in `localStorage`, including:
+The browser client stores a persistent player identity in a browser cookie, including:
 
 - a stable player ID
 - a generated display name
