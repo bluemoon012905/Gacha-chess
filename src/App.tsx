@@ -13,6 +13,7 @@ import type {
   GameAction,
   GameKey,
   JoinResponse,
+  LobbyAction,
   RoomPayload,
   RoomSnapshot,
   SeatRole,
@@ -47,6 +48,15 @@ function formatTimestamp(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function getRoomHostName(room: RoomSnapshot | null): string {
+  if (!room?.roomHostPlayerId) return "Unassigned";
+  return room.members.find((member) => member.playerId === room.roomHostPlayerId)?.displayName ?? "Unassigned";
+}
+
+function isRoomMember(room: RoomSnapshot | null, playerId: string): boolean {
+  return room?.members.some((member) => member.playerId === playerId) ?? false;
 }
 
 function HomePage({
@@ -180,6 +190,8 @@ function RoomPage({
   roomState,
   gameState,
   joinRole,
+  isRoomHost,
+  isMember,
   playerName,
   pending,
   message,
@@ -192,6 +204,7 @@ function RoomPage({
   onHostColorChange,
   onStartGame,
   onCopyInvite,
+  onLobbyAction,
   onMove,
   onCapture,
   onDrawAndDiscard,
@@ -200,6 +213,8 @@ function RoomPage({
   roomState: RoomSnapshot | null;
   gameState: AnyGameState | null;
   joinRole: SeatRole;
+  isRoomHost: boolean;
+  isMember: boolean;
   playerName: string;
   pending: boolean;
   message: string | null;
@@ -212,6 +227,7 @@ function RoomPage({
   onHostColorChange: (value: HostColorChoice) => void;
   onStartGame: () => Promise<void>;
   onCopyInvite: () => Promise<void>;
+  onLobbyAction: (action: LobbyAction) => Promise<void>;
   onMove: (from: string, to: string) => Promise<void>;
   onCapture: (handCardId: string, openCardIds: string[]) => Promise<void>;
   onDrawAndDiscard: (discardCardId: string) => Promise<void>;
@@ -243,8 +259,8 @@ function RoomPage({
               <strong>{playerName}</strong>
             </article>
             <article className="stat-card">
-              <span>Seat</span>
-              <strong>{joinRole}</strong>
+              <span>Room Host</span>
+              <strong>{getRoomHostName(roomState)}</strong>
             </article>
           </div>
 
@@ -252,6 +268,10 @@ function RoomPage({
             <article className="seat-card">
               <span>Created</span>
               <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
+            </article>
+            <article className="seat-card">
+              <span>Your status</span>
+              <strong>{isRoomHost ? `${joinRole} · room host` : joinRole}</strong>
             </article>
             <article className="seat-card">
               <span>Players Needed</span>
@@ -263,14 +283,14 @@ function RoomPage({
 
           <div className="seat-grid">
             <article className="seat-card">
-              <span>Host</span>
+              <span>Player A</span>
               <strong>
                 {roomState?.host.displayName ?? "Open seat"}
                 {chessState ? ` · ${chessState.hostColor}` : ""}
               </strong>
             </article>
             <article className="seat-card">
-              <span>Guest</span>
+              <span>Player B</span>
               <strong>
                 {roomState?.guest.displayName ?? "Open seat"}
                 {chessState ? ` · ${chessState.guestColor}` : ""}
@@ -283,19 +303,91 @@ function RoomPage({
             {roomState?.members.length ? (
               <div className="member-list">
                 {roomState.members.map((member) => (
-                  <div className="member-pill" key={member.playerId}>
-                    {member.displayName}
+                  <div className="member-card" key={member.playerId}>
+                    <strong>{member.displayName}</strong>
+                    <span>
+                      {member.playerId === roomState.roomHostPlayerId
+                        ? "Room host"
+                        : member.playerId === roomState.host.playerId
+                          ? "Player A"
+                          : member.playerId === roomState.guest.playerId
+                            ? "Player B"
+                            : "Watcher"}
+                    </span>
+                    {isRoomHost ? (
+                      <div className="member-actions">
+                        <button
+                          className="secondary"
+                          disabled={pending}
+                          onClick={() =>
+                            void onLobbyAction({
+                              type: "assign_seat",
+                              payload: { memberId: member.playerId, seat: "host" },
+                            })
+                          }
+                          type="button"
+                        >
+                          Make Player A
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={pending}
+                          onClick={() =>
+                            void onLobbyAction({
+                              type: "assign_seat",
+                              payload: { memberId: member.playerId, seat: "guest" },
+                            })
+                          }
+                          type="button"
+                        >
+                          Make Player B
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={pending || member.playerId === roomState.roomHostPlayerId}
+                          onClick={() =>
+                            void onLobbyAction({
+                              type: "transfer_room_host",
+                              payload: { memberId: member.playerId },
+                            })
+                          }
+                          type="button"
+                        >
+                          Transfer Host
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
             ) : (
               <p>No one has joined yet.</p>
             )}
+            {isRoomHost ? (
+              <div className="setup-actions">
+                <button
+                  className="secondary"
+                  disabled={pending || !roomState?.host.playerId}
+                  onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "host" } })}
+                  type="button"
+                >
+                  Clear Player A
+                </button>
+                <button
+                  className="secondary"
+                  disabled={pending || !roomState?.guest.playerId}
+                  onClick={() => void onLobbyAction({ type: "clear_seat", payload: { seat: "guest" } })}
+                  type="button"
+                >
+                  Clear Player B
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="room-actions">
             <button disabled={pending} onClick={() => void onClaimSeat()} type="button">
-              {pending ? "Working..." : "Join this room"}
+              {pending ? "Working..." : isMember ? "Refresh room membership" : "Join this room"}
             </button>
             <button className="secondary" onClick={() => void onCopyInvite()} type="button">
               Copy invite link
@@ -308,7 +400,7 @@ function RoomPage({
                 <label>
                   Timer
                   <select
-                    disabled={joinRole !== "host" || chessState.status !== "waiting" || pending}
+                    disabled={!isRoomHost || chessState.status !== "waiting" || pending}
                     onChange={(event) => onTimerChange(Number(event.target.value) as TimerPreset)}
                     value={configTimer}
                   >
@@ -323,7 +415,7 @@ function RoomPage({
                 <label>
                   Host color
                   <select
-                    disabled={joinRole !== "host" || chessState.status !== "waiting" || pending}
+                    disabled={!isRoomHost || chessState.status !== "waiting" || pending}
                     onChange={(event) => onHostColorChange(event.target.value as HostColorChoice)}
                     value={configHostColor}
                   >
@@ -339,7 +431,7 @@ function RoomPage({
               <div className="setup-actions">
                 <button
                   className="secondary"
-                  disabled={joinRole !== "host" || pending || chessState.status !== "waiting"}
+                  disabled={!isRoomHost || pending || chessState.status !== "waiting"}
                   onClick={() => void onSaveConfiguration()}
                   type="button"
                 >
@@ -347,7 +439,7 @@ function RoomPage({
                 </button>
                 <button
                   disabled={
-                    joinRole !== "host" ||
+                    !isRoomHost ||
                     pending ||
                     roomState?.status !== "ready" ||
                     chessState.status !== "waiting"
@@ -366,7 +458,7 @@ function RoomPage({
               </p>
               <div className="setup-actions">
                 <button
-                  disabled={joinRole !== "host" || pending || roomState?.status !== "ready"}
+                  disabled={!isRoomHost || pending || roomState?.status !== "ready"}
                   onClick={() => void onStartGame()}
                   type="button"
                 >
@@ -423,6 +515,8 @@ export default function App() {
   const [configTimer, setConfigTimer] = useState<TimerPreset>(300_000);
   const [configHostColor, setConfigHostColor] = useState<HostColorChoice>("white");
   const joinRole = getSeatRole(roomState, player.playerId);
+  const isMember = isRoomMember(roomState, player.playerId);
+  const isRoomHost = roomState?.roomHostPlayerId === player.playerId;
 
   useEffect(() => {
     if (!gameState || gameState.key !== "chess") return;
@@ -593,6 +687,39 @@ export default function App() {
     }
   }
 
+  async function updateLobby(action: LobbyAction) {
+    if (!roomId) return;
+
+    setPending(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/lobby`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-player-id": player.playerId,
+          "x-player-name": player.displayName,
+        },
+        body: JSON.stringify(action),
+      });
+
+      const payload = (await response.json()) as RoomPayload & { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not update lobby.");
+      }
+
+      setRoomState(payload.room);
+      setGameState(payload.game as AnyGameState);
+      setMessage("Lobby updated.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update lobby.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function saveConfiguration() {
     if (!roomId) return;
 
@@ -737,12 +864,15 @@ export default function App() {
       configTimer={configTimer}
       error={error}
       gameState={gameState}
+      isMember={isMember}
+      isRoomHost={isRoomHost}
       joinRole={joinRole}
       message={message}
       onCapture={captureFourteenPoints}
       onClaimSeat={claimSeat}
       onCopyInvite={copyInvite}
       onDrawAndDiscard={drawAndDiscardFourteenPoints}
+      onLobbyAction={updateLobby}
       onMove={(from, to) => sendAction({ type: "move", payload: { from, to } })}
       onHostColorChange={setConfigHostColor}
       onSaveConfiguration={saveConfiguration}

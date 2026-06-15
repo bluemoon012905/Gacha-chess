@@ -24,6 +24,7 @@ export type RoomState = {
   roomId: string;
   gameKey: GameKey;
   createdAt: string;
+  roomHostPlayerId: string | null;
   host: RoomSeat;
   guest: RoomSeat;
   members: RoomMember[];
@@ -57,6 +58,27 @@ export type FourteenPointsDrawAndDiscardAction = {
     discardCardId: string;
   };
 };
+
+export type LobbyAction =
+  | {
+      type: "assign_seat";
+      payload: {
+        memberId: string;
+        seat: "host" | "guest";
+      };
+    }
+  | {
+      type: "clear_seat";
+      payload: {
+        seat: "host" | "guest";
+      };
+    }
+  | {
+      type: "transfer_room_host";
+      payload: {
+        memberId: string;
+      };
+    };
 
 export type GameAction =
   | ChessMoveAction

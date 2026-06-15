@@ -17,6 +17,7 @@ import type {
   GameAction,
   GameKey,
   JoinResponse,
+  LobbyAction,
   RoomMember,
   PlayerIdentity,
   RoomPayload,
@@ -164,6 +165,19 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
 
+    if (url.pathname === "/lobby" && request.method === "POST") {
+      try {
+        const player = ensurePlayerIdentity(request.headers);
+        const action = (await request.json()) as LobbyAction;
+        return json(await this.updateLobby(player, action));
+      } catch (caught) {
+        return json(
+          { error: caught instanceof Error ? caught.message : "Could not update lobby." },
+          { status: 400 },
+        );
+      }
+    }
+
     if (url.pathname === "/start" && request.method === "POST") {
       try {
         return json(await this.startGame(ensurePlayerIdentity(request.headers)));
@@ -229,6 +243,7 @@ export class GameRoom extends DurableObject<Env> {
       roomId,
       gameKey,
       createdAt: new Date().toISOString(),
+      roomHostPlayerId: null,
       host: { playerId: null, displayName: null },
       guest: { playerId: null, displayName: null },
       members: [],
@@ -272,6 +287,9 @@ export class GameRoom extends DurableObject<Env> {
     const role = this.resolveSeatRole(stored.room, player.playerId);
     let nextRole = role;
     stored.room.members = upsertMember(stored.room.members, player, new Date().toISOString());
+    if (!stored.room.roomHostPlayerId) {
+      stored.room.roomHostPlayerId = player.playerId;
+    }
 
     if (role === "host") {
       stored.room.host = replaceSeat(stored.room.host, player);
@@ -295,13 +313,45 @@ export class GameRoom extends DurableObject<Env> {
     };
   }
 
+  private async updateLobby(player: PlayerIdentity, action: LobbyAction): Promise<RoomPayload> {
+    const stored = await this.requireStoredRoom();
+    stored.room.members = upsertMember(stored.room.members, player, new Date().toISOString());
+
+    if (stored.room.roomHostPlayerId !== player.playerId) {
+      throw new Error("Only the room host can manage the lobby.");
+    }
+
+    if (gameHasStarted(stored.game)) {
+      throw new Error("Lobby assignments are locked after the game starts.");
+    }
+
+    switch (action.type) {
+      case "assign_seat":
+        this.assignSeat(stored.room, action.payload.memberId, action.payload.seat);
+        break;
+      case "clear_seat":
+        this.clearSeat(stored.room, action.payload.seat);
+        break;
+      case "transfer_room_host":
+        this.transferRoomHost(stored.room, action.payload.memberId);
+        break;
+      default:
+        throw new Error("Unsupported lobby action.");
+    }
+
+    await this.ctx.storage.put("state", stored);
+    const payload = this.toPayload(stored);
+    this.broadcastRoomState(payload);
+    return payload;
+  }
+
   private async configureGame(
     player: PlayerIdentity,
     body: Record<string, unknown>,
   ): Promise<RoomPayload> {
     const stored = await this.requireStoredRoom();
-    if (this.resolveSeatRole(stored.room, player.playerId) !== "host") {
-      throw new Error("Only the host can update room settings.");
+    if (stored.room.roomHostPlayerId !== player.playerId) {
+      throw new Error("Only the room host can update room settings.");
     }
 
     const refreshed = this.withFreshGame(stored);
@@ -318,8 +368,8 @@ export class GameRoom extends DurableObject<Env> {
 
   private async startGame(player: PlayerIdentity): Promise<RoomPayload> {
     const stored = await this.requireStoredRoom();
-    if (this.resolveSeatRole(stored.room, player.playerId) !== "host") {
-      throw new Error("Only the host can start the room.");
+    if (stored.room.roomHostPlayerId !== player.playerId) {
+      throw new Error("Only the room host can start the room.");
     }
 
     if (!stored.room.host.playerId || !stored.room.guest.playerId) {
@@ -395,6 +445,7 @@ export class GameRoom extends DurableObject<Env> {
     return {
       room: {
         ...stored.room,
+        roomHostPlayerId: stored.room.roomHostPlayerId ?? stored.room.host?.playerId ?? null,
         host: stored.room.host ?? { playerId: null, displayName: null },
         guest: stored.room.guest ?? { playerId: null, displayName: null },
         members:
@@ -432,6 +483,44 @@ export class GameRoom extends DurableObject<Env> {
     if (room.host.playerId === playerId) return "host";
     if (room.guest.playerId === playerId) return "guest";
     return "spectator";
+  }
+
+  private assignSeat(room: RoomState, memberId: string, seat: "host" | "guest"): void {
+    const member = room.members.find((entry) => entry.playerId === memberId);
+    if (!member) {
+      throw new Error("Selected member is not in the room.");
+    }
+
+    if (seat === "host") {
+      if (room.guest.playerId === memberId) {
+        room.guest = { playerId: null, displayName: null };
+      }
+      room.host = { playerId: member.playerId, displayName: member.displayName };
+      return;
+    }
+
+    if (room.host.playerId === memberId) {
+      room.host = { playerId: null, displayName: null };
+    }
+    room.guest = { playerId: member.playerId, displayName: member.displayName };
+  }
+
+  private clearSeat(room: RoomState, seat: "host" | "guest"): void {
+    if (seat === "host") {
+      room.host = { playerId: null, displayName: null };
+      return;
+    }
+
+    room.guest = { playerId: null, displayName: null };
+  }
+
+  private transferRoomHost(room: RoomState, memberId: string): void {
+    const member = room.members.find((entry) => entry.playerId === memberId);
+    if (!member) {
+      throw new Error("Selected member is not in the room.");
+    }
+
+    room.roomHostPlayerId = member.playerId;
   }
 }
 
@@ -492,7 +581,7 @@ export default {
       return response;
     }
 
-    const forwardableRoute = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/(join|configure|start|action)$/i);
+    const forwardableRoute = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/(join|configure|start|action|lobby)$/i);
     if (forwardableRoute && ["POST"].includes(request.method)) {
       const roomId = forwardableRoute[1];
       const route = forwardableRoute[2];
