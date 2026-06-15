@@ -14,16 +14,24 @@ export type RoomSeat = {
   displayName: string | null;
 };
 
+export type RoomMember = {
+  playerId: string;
+  displayName: string;
+  joinedAt: string;
+};
+
 export type RoomState = {
   roomId: string;
   gameKey: GameKey;
   createdAt: string;
   host: RoomSeat;
   guest: RoomSeat;
+  members: RoomMember[];
 };
 
 export type RoomSnapshot = RoomState & {
   playerCount: number;
+  seatedPlayerCount: number;
   status: "waiting" | "ready";
 };
 

@@ -235,6 +235,10 @@ function RoomPage({
               <strong>{roomState?.status ?? "loading"}</strong>
             </article>
             <article className="stat-card">
+              <span>Members</span>
+              <strong>{roomState?.playerCount ?? 0}</strong>
+            </article>
+            <article className="stat-card">
               <span>You</span>
               <strong>{playerName}</strong>
             </article>
@@ -242,9 +246,18 @@ function RoomPage({
               <span>Seat</span>
               <strong>{joinRole}</strong>
             </article>
-            <article className="stat-card">
+          </div>
+
+          <div className="seat-grid">
+            <article className="seat-card">
               <span>Created</span>
               <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
+            </article>
+            <article className="seat-card">
+              <span>Players Needed</span>
+              <strong>
+                {roomState ? `${roomState.seatedPlayerCount}/2 seated` : "..."}
+              </strong>
             </article>
           </div>
 
@@ -263,6 +276,21 @@ function RoomPage({
                 {chessState ? ` · ${chessState.guestColor}` : ""}
               </strong>
             </article>
+          </div>
+
+          <div className="panel-card">
+            <h2>Room Members</h2>
+            {roomState?.members.length ? (
+              <div className="member-list">
+                {roomState.members.map((member) => (
+                  <div className="member-pill" key={member.playerId}>
+                    {member.displayName}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>No one has joined yet.</p>
+            )}
           </div>
 
           <div className="room-actions">
@@ -334,7 +362,7 @@ function RoomPage({
           ) : (
             <div className="setup-panel">
               <p className="status-line">
-                Both seats must be filled before the host starts the game.
+                The room can hold more spectators, but two seated players are required to start.
               </p>
               <div className="setup-actions">
                 <button
@@ -555,8 +583,8 @@ export default function App() {
       setGameState(payload.game as AnyGameState);
       setMessage(
         payload.role === "spectator"
-          ? "Room is already full. You joined as a spectator."
-          : `You joined as ${payload.playerName}.`,
+          ? `You joined the room as ${payload.playerName}. The player seats are already taken.`
+          : `You joined the room as ${payload.playerName} and claimed the ${payload.role} seat.`,
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not join room.");

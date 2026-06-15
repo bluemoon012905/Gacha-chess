@@ -17,6 +17,7 @@ import type {
   GameAction,
   GameKey,
   JoinResponse,
+  RoomMember,
   PlayerIdentity,
   RoomPayload,
   RoomSeat,
@@ -56,12 +57,14 @@ function generateRoomId(): string {
 function roomSnapshotFromState(state: RoomState): RoomSnapshot {
   const hostJoined = state.host.playerId !== null;
   const guestJoined = state.guest.playerId !== null;
-  const playerCount = Number(hostJoined) + Number(guestJoined);
+  const seatedPlayerCount = Number(hostJoined) + Number(guestJoined);
+  const playerCount = state.members.length;
 
   return {
     ...state,
     playerCount,
-    status: playerCount >= 2 ? "ready" : "waiting",
+    seatedPlayerCount,
+    status: seatedPlayerCount >= 2 ? "ready" : "waiting",
   };
 }
 
@@ -82,6 +85,25 @@ function replaceSeat(seat: RoomSeat, identity: PlayerIdentity): RoomSeat {
     playerId: identity.playerId,
     displayName: identity.displayName || seat.displayName,
   };
+}
+
+function upsertMember(
+  members: RoomMember[],
+  identity: PlayerIdentity,
+  joinedAt: string,
+): RoomMember[] {
+  const existingIndex = members.findIndex((member) => member.playerId === identity.playerId);
+  const member: RoomMember = {
+    playerId: identity.playerId,
+    displayName: identity.displayName,
+    joinedAt: existingIndex >= 0 ? members[existingIndex].joinedAt : joinedAt,
+  };
+
+  if (existingIndex < 0) {
+    return [...members, member];
+  }
+
+  return members.map((existing, index) => (index === existingIndex ? member : existing));
 }
 
 function gameHasStarted(game: AnyGameState): boolean {
@@ -209,6 +231,7 @@ export class GameRoom extends DurableObject<Env> {
       createdAt: new Date().toISOString(),
       host: { playerId: null, displayName: null },
       guest: { playerId: null, displayName: null },
+      members: [],
     };
 
     const stored: StoredRoom = {
@@ -248,6 +271,7 @@ export class GameRoom extends DurableObject<Env> {
     const stored = await this.requireStoredRoom();
     const role = this.resolveSeatRole(stored.room, player.playerId);
     let nextRole = role;
+    stored.room.members = upsertMember(stored.room.members, player, new Date().toISOString());
 
     if (role === "host") {
       stored.room.host = replaceSeat(stored.room.host, player);
@@ -373,6 +397,25 @@ export class GameRoom extends DurableObject<Env> {
         ...stored.room,
         host: stored.room.host ?? { playerId: null, displayName: null },
         guest: stored.room.guest ?? { playerId: null, displayName: null },
+        members:
+          stored.room.members?.length
+            ? stored.room.members
+            : [
+                stored.room.host?.playerId
+                  ? {
+                      playerId: stored.room.host.playerId,
+                      displayName: stored.room.host.displayName ?? "Host",
+                      joinedAt: stored.room.createdAt,
+                    }
+                  : null,
+                stored.room.guest?.playerId
+                  ? {
+                      playerId: stored.room.guest.playerId,
+                      displayName: stored.room.guest.displayName ?? "Guest",
+                      joinedAt: stored.room.createdAt,
+                    }
+                  : null,
+              ].filter((member): member is RoomMember => member !== null),
       },
       game: normalizeGameState(stored.room.gameKey, stored.game),
     };
