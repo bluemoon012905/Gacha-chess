@@ -333,6 +333,46 @@ h1 {
   flex: 1;
 }
 
+.compact-lobby-panel {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+}
+
+.compact-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.compact-meta-line-muted {
+  padding-top: 0.1rem;
+}
+
+.compact-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid rgba(34, 27, 20, 0.18);
+  background: rgba(255, 255, 255, 0.32);
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.compact-meta-line-muted .compact-meta-chip {
+  color: var(--muted);
+}
+
+.compact-seat-grid {
+  gap: 0.75rem;
+}
+
+.compact-seat-grid .seat-card {
+  padding: 0.8rem 0.9rem;
+}
+
 .room-shell .hero-panel {
   width: min(100%, 1360px);
 }
@@ -348,6 +388,7 @@ h1 {
 
 .room-layout.pregame-layout {
   grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
 }
 
 .room-sidebar {
@@ -1296,6 +1337,10 @@ h1 {
 
   .join-input-row {
     flex-direction: column;
+  }
+
+  .compact-meta-chip {
+    width: 100%;
   }
 
   .page-marker,

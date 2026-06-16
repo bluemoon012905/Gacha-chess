@@ -43,6 +43,17 @@ The room page is responsible for:
 - showing room metadata
 - rendering the selected game's interface
 
+## Lobby Design Direction
+
+The pregame room lobby should stay compact across every game:
+
+- shared room metadata should collapse into a single summary strip instead of several separate stat panels
+- game facts, room state, member count, and created time should sit together in one compact panel row when space allows
+- player identity, host info, seat assignment, and filled-seat count should share that same condensed summary treatment
+- seat occupancy, roster management, and game setup can remain separate panels, but the sidebar should avoid stacking small one-value cards
+
+This is the default direction for future room-page UI changes unless a game has a strong reason to break it.
+
 ## Shared Code Structure
 
 The shared layer is now separated into:

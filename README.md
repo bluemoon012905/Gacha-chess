@@ -13,6 +13,7 @@ The current playable path is still standard chess, but the room system, frontend
 - chess state definitions and chess behavior rules are stored separately
 - players get a generated persistent display name stored in a browser cookie
 - rooms display host and guest by generated name
+- pregame room lobbies use a compact shared metadata strip instead of stacked one-value stat panels
 
 ## Current Flow
 

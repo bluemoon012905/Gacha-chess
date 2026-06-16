@@ -84,6 +84,10 @@ function formatTimestamp(value: string): string {
   }).format(new Date(value));
 }
 
+function getTimerLabel(value: TimerPreset): string {
+  return TIMER_OPTIONS.find((option) => option.value === value)?.label ?? `${Math.round(value / 60000)} min`;
+}
+
 function getRoomHostName(room: RoomSnapshot | null): string {
   if (!room?.roomHostPlayerId) return "Unassigned";
   return room.members.find((member) => member.playerId === room.roomHostPlayerId)?.displayName ?? "Unassigned";
@@ -91,6 +95,33 @@ function getRoomHostName(room: RoomSnapshot | null): string {
 
 function isRoomMember(room: RoomSnapshot | null, playerId: string): boolean {
   return room?.members.some((member) => member.playerId === playerId) ?? false;
+}
+
+function getLobbyGameFacts(gameState: AnyGameState | null): string[] {
+  if (!gameState) return [];
+
+  if (gameState.key === "chess") {
+    return [
+      "Chess",
+      getTimerLabel(gameState.timerMs),
+      `Host ${gameState.hostColor}`,
+    ];
+  }
+
+  if (gameState.key === "five-ten-king") {
+    return [
+      "5-10-K",
+      `${gameState.config.deckCount} deck${gameState.config.deckCount === 1 ? "" : "s"}`,
+      `${gameState.config.pointsToWin} pts`,
+      `${gameState.config.cardsPerPlayer} cards each`,
+    ];
+  }
+
+  if (gameState.key === "fourteen-points") {
+    return ["14 points", "1 deck", "2 seats"];
+  }
+
+  return [];
 }
 
 function isFourteenPointsAiMember(playerId: string): boolean {
@@ -441,6 +472,7 @@ function RoomPage({
     gameState?.key === "fourteen-points" ? (gameState as FourteenPointsState) : null;
   const fiveTenKingState =
     gameState?.key === "five-ten-king" ? (gameState as FiveTenKingState) : null;
+  const lobbyGameFacts = getLobbyGameFacts(gameState);
   const hasGameStarted = chessState
     ? chessState.status !== "waiting"
     : fourteenPointsState
@@ -469,49 +501,45 @@ function RoomPage({
               </p>
             </section>
 
-            <div className="stats-grid">
-              <article className="stat-card">
-                <span>Room state</span>
-                <strong>{roomState?.status ?? "loading"}</strong>
-              </article>
-              <article className="stat-card">
-                <span>Members</span>
-                <strong>{roomState?.playerCount ?? 0}</strong>
-              </article>
-              <article className="stat-card">
-                <span>You</span>
-                <strong>{playerName}</strong>
-              </article>
-              <article className="stat-card">
-                <span>Desk host</span>
-                <strong>{getRoomHostName(roomState)}</strong>
-              </article>
-            </div>
-
-            <div className="seat-grid">
-              <article className="seat-card">
-                <span>Created</span>
-                <strong>{roomState ? formatTimestamp(roomState.createdAt) : "..."}</strong>
-              </article>
-              <article className="seat-card">
-                <span>Your seat</span>
-                <strong>
+            <section className="panel-card compact-lobby-panel">
+              <div className="compact-meta-line">
+                {lobbyGameFacts.map((fact) => (
+                  <span className="compact-meta-chip" key={fact}>
+                    {fact}
+                  </span>
+                ))}
+                <span className="compact-meta-chip">
+                  {roomState?.status ?? "loading"}
+                </span>
+                <span className="compact-meta-chip">
+                  {roomState?.playerCount ?? 0} member{roomState?.playerCount === 1 ? "" : "s"}
+                </span>
+                <span className="compact-meta-chip">
+                  {roomState ? formatTimestamp(roomState.createdAt) : "..."}
+                </span>
+              </div>
+              <div className="compact-meta-line compact-meta-line-muted">
+                <span className="compact-meta-chip">
+                  You: {playerName}
+                </span>
+                <span className="compact-meta-chip">
+                  Host: {getRoomHostName(roomState)}
+                </span>
+                <span className="compact-meta-chip">
+                  Seat:{" "}
                   {isRoomHost
                     ? `${joinRole === "spectator" ? "spectator" : getSeatLabel(joinRole)} · room host`
                     : joinRole === "spectator"
                       ? "spectator"
                       : getSeatLabel(joinRole)}
-                </strong>
-              </article>
-              <article className="seat-card">
-                <span>Seats filled</span>
-                <strong>
+                </span>
+                <span className="compact-meta-chip">
                   {roomState ? `${roomState.seatedPlayerCount}/${roomState.seatOrder.length} seated` : "..."}
-                </strong>
-              </article>
-            </div>
+                </span>
+              </div>
+            </section>
 
-            <div className="seat-grid">
+            <div className="seat-grid compact-seat-grid">
               {roomState?.seatOrder.map((seat) => (
                 <article className="seat-card" key={seat}>
                   <span>{getSeatLabel(seat)}</span>
