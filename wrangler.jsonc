@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gacha-chess",
+  "name": "gachachess",
   "main": "worker/index.ts",
   "compatibility_date": "2026-06-13",
   "assets": {
