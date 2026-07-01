@@ -1,0 +1,119 @@
+Board Game Piece Rules
+General Notes
+Each piece has its own movement, special ability, and capture method.
+Some pieces can move and then use an ability, while others must choose between moving or capturing. If a piece triggers a trap while moving, it is captured immediately and stops on the trap space, even if that was not its final destination.
+
+Pieces
+1. Horizontal Diagonal
+Abbreviation: HD
+Capture Method: A, B, or C
+Movement
+The Horizontal Diagonal piece can move horizontally by 1 block.
+Capture
+This piece can capture diagonally up to 2 blocks away without moving onto the captured space.
+It can capture in all four diagonal directions at the same time.
+Turn Rules
+This piece cannot capture and then move.
+It may either:
+Move first, then capture
+Capture without moving
+
+2. Trap Maker
+Capture Method: A
+Movement
+The Trap Maker can move 1 block in any of the 8 directions.
+Special Ability: Create Trap
+The Trap Maker can place a trap either:
+Under itself
+On the space it started from this round
+Trap Rules
+Once a trap is placed, the player may trigger any number of their traps whenever they want.
+A trap can also be triggered if an opponent captures the space where the trap is located.
+
+3. Standard
+Capture Method: B or C
+Movement
+The Standard piece can move horizontally up to 2 blocks per round.
+It may turn during the movement, allowing it to move in an L-shape.
+Capture
+The Standard piece can capture any space it has walked over during its movement.
+Trap Rule
+If the Standard piece walks over a trap and that trap is triggered, the piece is captured immediately and stops on that trap space, even if its final destination was somewhere else.
+
+4. Detector
+Capture Method: D
+Movement
+The Detector can move 1 block in any direction.
+Special Ability: Detect
+The Detector can toss out up to 3 detection markers.
+Each detection marker expands horizontally from the space where it lands.
+Detection markers can only be tossed to spaces within 1 block of the Detector.
+Detection Rules
+When a detection marker is used, the opponent must say whether there are any pieces or traps in the detected area.
+The opponent must give the exact locations of anything found.
+However, the opponent does not have to say whether each object is a piece or a trap.
+Turn Rules
+The Detector may:
+Detect, then move
+Move, then detect
+Detect without moving
+
+5. Long Range
+Capture Method: B
+Movement
+The Long Range piece can move horizontally.
+Capture
+The Long Range piece can capture spaces that are either 2 or 3 blocks away in the four horizontal directions.
+This means it can capture up to 8 different spaces.
+Turn Rules
+The Long Range piece must choose between moving or capturing.
+It cannot:
+Move and then capture
+Capture and then move
+It must either:
+Move without capturing
+Capture without moving
+
+6. Pusher
+Capture Method: E
+Movement
+The Pusher can move horizontally by 1 block.
+Special Ability: Push
+The Pusher can toss out up to 2 push markers.
+Each push marker pushes pieces away from the center by 1 block.
+Push markers can be tossed to any of the 8 spaces around the Pusher.
+Turn Rules
+The Pusher may:
+Move, then toss push markers
+Toss push markers without moving
+The Pusher cannot toss push markers and then move.
+
+7. Dragger
+Capture Method: F
+Movement
+The Dragger can move horizontally by 1 block.
+Capture
+The Dragger can capture spaces in a knight-shape around it, giving it 8 possible capture spots.
+Special Ability: Drag
+The Dragger can toss out up to 3 drag markers.
+When a piece is dragged, the owner of that piece does not have to reveal the original location of the dragged piece.
+Turn Rules
+The Dragger cannot capture and then move.
+It may either:
+Move first, then capture
+Capture without moving
+
+8. Road Maker
+Movement
+The Road Maker moves like a Trap Maker.
+It can move 1 block in any of the 8 directions.
+Special Ability: Build Roads
+The Road Maker can build road spaces.
+If a piece is on one road space, it can move to any other road space.
+The road spaces do not need to be connected.
+Road Rule
+A piece cannot capture after moving through the road.
+Exception: Trap Makers can still capture or use their function after moving through a road.
+Function
+The Road Maker functions like a Trap Maker.
+
